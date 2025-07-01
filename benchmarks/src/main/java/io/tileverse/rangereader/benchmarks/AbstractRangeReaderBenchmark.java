@@ -15,10 +15,10 @@
  */
 package io.tileverse.rangereader.benchmarks;
 
-import io.tileverse.rangereader.BlockAlignedRangeReader;
-import io.tileverse.rangereader.DiskCachingRangeReader;
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.RangeReaderFactory;
+import io.tileverse.rangereader.block.BlockAlignedRangeReader;
+import io.tileverse.rangereader.cache.DiskCachingRangeReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;

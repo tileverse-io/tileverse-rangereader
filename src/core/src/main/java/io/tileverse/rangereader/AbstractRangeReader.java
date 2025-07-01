@@ -18,7 +18,7 @@ package io.tileverse.rangereader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-abstract class AbstractRangeReader implements RangeReader {
+public abstract class AbstractRangeReader implements RangeReader {
 
     @Override
     public final int readRange(long offset, int length, ByteBuffer target) throws IOException {

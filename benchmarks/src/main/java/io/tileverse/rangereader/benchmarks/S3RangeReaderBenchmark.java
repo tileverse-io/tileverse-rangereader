@@ -18,7 +18,7 @@ package io.tileverse.rangereader.benchmarks;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.S3;
 
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.S3RangeReader;
+import io.tileverse.rangereader.s3.S3RangeReader;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;

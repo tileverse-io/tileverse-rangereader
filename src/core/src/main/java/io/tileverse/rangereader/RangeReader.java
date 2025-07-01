@@ -27,7 +27,7 @@ import java.nio.ByteBuffer;
  * <p>
  * All implementations of this interface MUST be thread-safe to allow concurrent
  * access from multiple threads without interference. This is especially
- * important in server environments like GeoServer where multiple requests may
+ * important in server environments where multiple requests may
  * be accessing the same reader.
  */
 public interface RangeReader extends Closeable {

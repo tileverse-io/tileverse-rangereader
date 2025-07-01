@@ -15,6 +15,7 @@
  */
 package io.tileverse.rangereader.http;
 
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest.Builder;
 
 /**
@@ -29,8 +30,9 @@ public interface HttpAuthentication {
     /**
      * Apply authentication to an HTTP request.
      *
+     * @param httpClient the HTTP client the request is being built for
      * @param requestBuilder The HTTP request builder to authenticate
      * @return The same request builder with authentication applied
      */
-    Builder authenticate(Builder requestBuilder);
+    Builder authenticate(HttpClient httpClient, Builder requestBuilder);
 }

@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" root="true" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 http://maven.apache.org/xsd/maven-4.1.0.xsd">
+  <modelVersion>4.1.0</modelVersion>
 
   <groupId>io.tileverse.rangereader</groupId>
   <artifactId>tileverse-rangereader</artifactId>
   <version>${revision}</version>
   <packaging>pom</packaging>
-
   <name>Tileverse Range Reader</name>
   <description>A Java 17 library for reading content from multiple sources using range readers</description>
   <url>https://tileverse.io</url>
@@ -19,37 +18,39 @@
   <properties>
     <!-- CI-friendly version management -->
     <revision>1.0-SNAPSHOT</revision>
+
+    <!-- Build properties -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>17</maven.compiler.release>
+
+    <!-- Default formatter/linter properties, see the qa profile -->
     <fmt.skip>false</fmt.skip>
     <sortpom.skip>${fmt.skip}</sortpom.skip>
     <sortpom.action>sort</sortpom.action>
     <spotless.skip>${fmt.skip}</spotless.skip>
     <spotless.action>apply</spotless.action>
 
-    <!-- Build properties -->
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.release>17</maven.compiler.release>
-
     <!-- Dependency versions -->
-    <protobuf.version>4.31.1</protobuf.version>
-    <commons-compress.version>1.27.1</commons-compress.version>
-    <commons-io.version>2.19.0</commons-io.version>
-    <caffeine.version>3.2.1</caffeine.version>
-    <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
-    <azure-identity.version>1.15.4</azure-identity.version>
-    <aws-s3.version>2.31.70</aws-s3.version>
     <aws-auth.version>2.31.70</aws-auth.version>
+    <aws-s3.version>2.31.70</aws-s3.version>
+    <azure-identity.version>1.15.4</azure-identity.version>
+    <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
+    <caffeine.version>3.2.1</caffeine.version>
     <google-cloud-storage.version>2.53.1</google-cloud-storage.version>
-    <netty.version>4.1.122.Final</netty.version>
     <jackson.version>2.19.1</jackson.version>
+    <netty.version>4.1.122.Final</netty.version>
+    <protobuf.version>4.31.1</protobuf.version>
     <slf4j.version>2.0.9</slf4j.version>
-    <logback.version>1.5.18</logback.version>
-    <picocli.version>4.7.7</picocli.version>
-    <junit.version>5.13.2</junit.version>
-    <mockito.version>5.18.0</mockito.version>
+
+    <!-- Test Dependency versions -->
     <assertj.version>3.27.3</assertj.version>
-    <wiremock.version>3.13.1</wiremock.version>
     <awaitility.version>4.3.0</awaitility.version>
+    <commons-io.version>2.19.0</commons-io.version>
+    <junit.version>5.13.2</junit.version>
+    <logback.version>1.5.18</logback.version>
+    <mockito.version>5.18.0</mockito.version>
     <testcontainers.version>1.21.2</testcontainers.version>
+    <wiremock.version>3.13.1</wiremock.version>
   </properties>
 
   <dependencyManagement>
@@ -69,10 +70,11 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
       <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers-bom</artifactId>
-        <version>${testcontainers.version}</version>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-bom</artifactId>
+        <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -82,51 +84,14 @@
         <version>4.5.14</version>
       </dependency>
       <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-bom</artifactId>
-        <version>${netty.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
         <version>1.18.0</version>
       </dependency>
-      <!-- Internal modules -->
       <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-core</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-azure</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-gcp</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-s3</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-
-      <!-- Protocol Buffers -->
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-
-      <!-- Compression -->
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-compress</artifactId>
-        <version>${commons-compress.version}</version>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>1.18.38</version>
       </dependency>
 
       <!-- Caching -->
@@ -134,12 +99,6 @@
         <groupId>com.github.ben-manes.caffeine</groupId>
         <artifactId>caffeine</artifactId>
         <version>${caffeine.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.google.errorprone</groupId>
-            <artifactId>error_prone_annotations</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
 
       <!-- Cloud Storage -->
@@ -201,19 +160,47 @@
         <version>${logback.version}</version>
       </dependency>
 
-      <!-- CLI -->
+      <!-- Internal modules -->
       <dependency>
-        <groupId>info.picocli</groupId>
-        <artifactId>picocli</artifactId>
-        <version>${picocli.version}</version>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-azure</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-gcs</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-s3</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-all</artifactId>
+        <version>${project.version}</version>
       </dependency>
 
       <!-- Testing -->
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter</artifactId>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
         <version>${junit.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -264,36 +251,6 @@
     </dependencies>
   </dependencyManagement>
 
-  <dependencies>
-    <!-- Common dependencies for all modules -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-
-    <!-- Testing -->
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-
   <build>
     <pluginManagement>
       <plugins>
@@ -301,6 +258,7 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.14.0</version>
+          <inherited>true</inherited>
           <configuration>
             <release>${maven.compiler.release}</release>
           </configuration>
@@ -309,6 +267,7 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
           <version>3.5.0</version>
+          <inherited>true</inherited>
           <executions>
             <execution>
               <id>enforce-rules</id>
@@ -318,15 +277,15 @@
               <configuration>
                 <rules>
                   <requireJavaVersion>
-                    <version>[17,)</version>
-                    <message>Java 17 or newer is required to build this project</message>
+                    <version>[${maven.compiler.release}},)</version>
+                    <message>Java ${maven.compiler.release} or newer is required to build this project</message>
                   </requireJavaVersion>
                   <dependencyConvergence>
                     <excludedScopes>test</excludedScopes>
                   </dependencyConvergence>
                   <requireMavenVersion>
-                    <version>[3.9.0,)</version>
-                    <message>Maven 3.9.0 or newer is required</message>
+                    <version>[4.0.0-rc-4,)</version>
+                    <message>Maven 4.0.0 or newer is required</message>
                   </requireMavenVersion>
                 </rules>
               </configuration>
@@ -356,6 +315,28 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
           <version>3.4.2</version>
+          <inherited>true</inherited>
+          <configuration>
+            <!-- Default configuration for all JAR files -->
+            <excludes>
+              <exclude>**/logback-test.xml</exclude>
+            </excludes>
+          </configuration>
+          <executions>
+            <execution>
+              <id>test-jar</id>
+              <goals>
+                <goal>test-jar</goal>
+              </goals>
+              <configuration>
+                <!-- Specific configuration for test JARs -->
+                <excludes>
+                  <exclude>**/logback-test.xml</exclude>
+                  <exclude>logback-test.xml</exclude>
+                </excludes>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -383,24 +364,14 @@
           <version>4.0.0</version>
         </plugin>
         <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>flatten-maven-plugin</artifactId>
-          <version>1.7.1</version>
-        </plugin>
-        <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
-          <version>3.5.0</version>
+          <version>3.8.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
-          <version>3.5.2</version>
-        </plugin>
-        <plugin>
-          <groupId>org.commonjava.maven.plugins</groupId>
-          <artifactId>directory-maven-plugin</artifactId>
-          <version>1.0</version>
+          <version>3.6.0</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -409,56 +380,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <configuration>
-          <rules>
-            <requireJavaVersion>
-              <version>[21,)</version>
-              <message>Java 21 or newer is required to build this project</message>
-            </requireJavaVersion>
-            <dependencyConvergence>
-              <excludedScopes>test</excludedScopes>
-            </dependencyConvergence>
-            <bannedDependencies>
-              <excludes>
-                <exclude>log4j:log4j</exclude>
-                <exclude>org.apache.logging.log4j:log4j-core:(,2.17.1)</exclude>
-              </excludes>
-            </bannedDependencies>
-            <requireMavenVersion>
-              <version>[3.8.0,)</version>
-              <message>Maven 3.8.0 or newer is required</message>
-            </requireMavenVersion>
-          </rules>
-        </configuration>
-        <executions>
-          <execution>
-            <id>enforce-rules</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <phase>validate</phase>
-          </execution>
-        </executions>
       </plugin>
-
-      <!-- Directory plugin to find the root project directory -->
-      <plugin>
-        <groupId>org.commonjava.maven.plugins</groupId>
-        <artifactId>directory-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>directories</id>
-            <goals>
-              <goal>highest-basedir</goal>
-            </goals>
-            <phase>initialize</phase>
-            <configuration>
-              <property>tileverseRootDir</property>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -504,7 +426,7 @@
               <version>2.61.0</version>
             </palantirJavaFormat>
             <licenseHeader>
-              <file>${session.executionRootDirectory}/license_header.txt</file>
+              <file>/Users/groldan/git/multiversio/tileverse-io/tileverse-rangereader/license_header.txt</file>
             </licenseHeader>
           </java>
           <upToDateChecking>
@@ -543,32 +465,6 @@
               <goal>${sortpom.action}</goal>
             </goals>
             <phase>validate</phase>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- CI-friendly version management with flatten-maven-plugin -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>flatten-maven-plugin</artifactId>
-        <configuration>
-          <updatePomFile>true</updatePomFile>
-          <flattenMode>oss</flattenMode>
-        </configuration>
-        <executions>
-          <execution>
-            <id>flatten</id>
-            <goals>
-              <goal>flatten</goal>
-            </goals>
-            <phase>process-resources</phase>
-          </execution>
-          <execution>
-            <id>flatten.clean</id>
-            <goals>
-              <goal>clean</goal>
-            </goals>
-            <phase>clean</phase>
           </execution>
         </executions>
       </plugin>

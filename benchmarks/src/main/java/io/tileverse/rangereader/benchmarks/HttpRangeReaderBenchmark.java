@@ -15,8 +15,8 @@
  */
 package io.tileverse.rangereader.benchmarks;
 
-import io.tileverse.rangereader.HttpRangeReader;
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.http.HttpRangeReader;
 import java.io.IOException;
 import java.net.URI;
 import org.openjdk.jmh.annotations.Level;

@@ -18,9 +18,9 @@ package io.tileverse.rangereader.it;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.tileverse.rangereader.BlockAlignedRangeReader;
-import io.tileverse.rangereader.CachingRangeReader;
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.block.BlockAlignedRangeReader;
+import io.tileverse.rangereader.cache.CachingRangeReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;

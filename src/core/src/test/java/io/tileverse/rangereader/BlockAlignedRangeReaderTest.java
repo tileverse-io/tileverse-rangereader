@@ -18,6 +18,8 @@ package io.tileverse.rangereader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.tileverse.rangereader.block.BlockAlignedRangeReader;
+import io.tileverse.rangereader.file.FileRangeReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

@@ -19,6 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.tileverse.rangereader.block.BlockAlignedRangeReader;
+import io.tileverse.rangereader.cache.CachingRangeReader;
+import io.tileverse.rangereader.cache.DiskCachingRangeReader;
+import io.tileverse.rangereader.file.FileRangeReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;

@@ -15,8 +15,9 @@
  */
 package io.tileverse.rangereader.http;
 
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest.Builder;
-import java.util.Objects;
+import lombok.NonNull;
 
 /**
  * API Key Authentication implementation for HttpRangeReader.
@@ -50,14 +51,14 @@ public class ApiKeyAuthentication implements HttpAuthentication {
      * @param apiKey The API key value
      * @param valuePrefix An optional prefix for the API key value (e.g., "ApiKey ")
      */
-    public ApiKeyAuthentication(String headerName, String apiKey, String valuePrefix) {
-        this.headerName = Objects.requireNonNull(headerName, "Header name cannot be null");
-        this.apiKey = Objects.requireNonNull(apiKey, "API key cannot be null");
+    public ApiKeyAuthentication(@NonNull String headerName, @NonNull String apiKey, String valuePrefix) {
+        this.headerName = headerName;
+        this.apiKey = apiKey;
         this.valuePrefix = valuePrefix != null ? valuePrefix : "";
     }
 
     @Override
-    public Builder authenticate(Builder requestBuilder) {
+    public Builder authenticate(HttpClient httpClient, Builder requestBuilder) {
         return requestBuilder.header(headerName, valuePrefix + apiKey);
     }
 }

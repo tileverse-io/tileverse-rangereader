@@ -15,6 +15,7 @@
  */
 package io.tileverse.rangereader.http;
 
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest.Builder;
 import java.util.Objects;
 
@@ -38,7 +39,7 @@ public class BearerTokenAuthentication implements HttpAuthentication {
     }
 
     @Override
-    public Builder authenticate(Builder requestBuilder) {
+    public Builder authenticate(HttpClient httpClient, Builder requestBuilder) {
         return requestBuilder.header("Authorization", "Bearer " + token);
     }
 }

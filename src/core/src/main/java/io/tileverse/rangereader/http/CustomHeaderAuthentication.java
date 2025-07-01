@@ -15,6 +15,7 @@
  */
 package io.tileverse.rangereader.http;
 
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest.Builder;
 import java.util.Collections;
 import java.util.Map;
@@ -45,7 +46,7 @@ public class CustomHeaderAuthentication implements HttpAuthentication {
     }
 
     @Override
-    public Builder authenticate(Builder requestBuilder) {
+    public Builder authenticate(HttpClient httpClient, Builder requestBuilder) {
         // Add all headers to the request builder
         headers.forEach(requestBuilder::header);
         return requestBuilder;

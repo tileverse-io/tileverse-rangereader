@@ -50,7 +50,6 @@ public class DigestAuthentication implements HttpAuthentication {
 
     private final String username;
     private final String password;
-    private final HttpClient httpClient;
     private final Map<URI, DigestParams> digestParamsCache = new ConcurrentHashMap<>();
     private final AtomicInteger nonceCounter = new AtomicInteger(1);
 
@@ -59,16 +58,14 @@ public class DigestAuthentication implements HttpAuthentication {
      *
      * @param username The username
      * @param password The password
-     * @param httpClient The HTTP client to use for challenge requests
      */
-    public DigestAuthentication(String username, String password, HttpClient httpClient) {
+    public DigestAuthentication(String username, String password) {
         this.username = Objects.requireNonNull(username, "Username cannot be null");
         this.password = Objects.requireNonNull(password, "Password cannot be null");
-        this.httpClient = Objects.requireNonNull(httpClient, "HttpClient cannot be null");
     }
 
     @Override
-    public HttpRequest.Builder authenticate(HttpRequest.Builder requestBuilder) {
+    public HttpRequest.Builder authenticate(HttpClient httpClient, HttpRequest.Builder requestBuilder) {
         URI uri = requestBuilder.build().uri();
 
         // Try to get cached digest parameters for this URI
@@ -77,7 +74,7 @@ public class DigestAuthentication implements HttpAuthentication {
         // If we don't have digest params yet, make a pre-flight request to get them
         if (params == null) {
             try {
-                params = fetchDigestParams(uri);
+                params = fetchDigestParams(httpClient, uri);
                 if (params != null) {
                     digestParamsCache.put(uri, params);
                 } else {
@@ -105,7 +102,7 @@ public class DigestAuthentication implements HttpAuthentication {
      * @param uri The URI to authenticate against
      * @return The digest parameters, or null if digest auth is not supported
      */
-    private DigestParams fetchDigestParams(URI uri) {
+    private DigestParams fetchDigestParams(HttpClient httpClient, URI uri) {
         try {
             HttpRequest request = HttpRequest.newBuilder(uri)
                     .method("HEAD", HttpRequest.BodyPublishers.noBody())

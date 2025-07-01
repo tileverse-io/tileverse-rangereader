@@ -15,8 +15,8 @@
  */
 package io.tileverse.rangereader.benchmarks;
 
-import io.tileverse.rangereader.FileRangeReader;
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.file.FileRangeReader;
 import java.io.IOException;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
