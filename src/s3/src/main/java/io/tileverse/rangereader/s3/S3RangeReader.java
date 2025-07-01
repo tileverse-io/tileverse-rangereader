@@ -123,6 +123,11 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
     }
 
     @Override
+    public String getSourceIdentifier() {
+        return "s3://" + bucket + "/" + key;
+    }
+
+    @Override
     public void close() {
         // S3Client is typically managed externally and should be closed by the caller
     }

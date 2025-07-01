@@ -130,6 +130,11 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
     }
 
     @Override
+    public String getSourceIdentifier() {
+        return "gs://" + bucket + "/" + objectName;
+    }
+
+    @Override
     public void close() {
         // Google Cloud Storage client is typically managed externally and should be closed by the caller
     }

@@ -35,12 +35,13 @@ public interface RangeReader extends Closeable {
     /**
      * Reads bytes from the source at the specified offset.
      * <p>
-     * Implementations MUST ensure this method is thread-safe, allowing concurrent
-     * calls from multiple threads without interference.
+     * This convenience method allocates a new ByteBuffer for each call. For better
+     * performance and reduced garbage collection pressure, prefer using
+     * {@link #readRange(long, int, ByteBuffer)} with reusable buffers when possible.
      *
      * @param offset The offset to read from
      * @param length The number of bytes to read
-     * @return A ByteBuffer containing the read bytes
+     * @return A ByteBuffer containing the read bytes, positioned for immediate consumption
      * @throws IOException              If an I/O error occurs
      * @throws IllegalArgumentException If offset or length is negative
      */
@@ -58,17 +59,10 @@ public interface RangeReader extends Closeable {
      * buffer.
      * <p>
      * This method allows callers to reuse ByteBuffers to reduce garbage collection
-     * pressure. The target buffer's position will be advanced by the number of
-     * bytes read. The caller is responsible for ensuring that the target buffer has
-     * sufficient remaining capacity for the requested length.
-     * <p>
-     * Implementations MUST ensure this method is thread-safe, allowing concurrent
-     * calls from multiple threads without interference.
-     * <p>
-     * Implementations should override this method with an optimized version that
-     * directly reads into the target buffer whenever possible to minimize
-     * allocations and copies. The default implementation provided here still
-     * allocates a temporary buffer, which is less efficient.
+     * pressure. The target buffer will be prepared for immediate consumption with
+     * its position unchanged and limit set to position + bytes read. The caller is
+     * responsible for ensuring that the target buffer has sufficient remaining
+     * capacity for the requested length.
      *
      * @param offset The offset to read from
      * @param length The number of bytes to read
@@ -92,4 +86,16 @@ public interface RangeReader extends Closeable {
      * @throws IOException If an I/O error occurs
      */
     long size() throws IOException;
+
+    /**
+     * Gets a unique identifier for the source being read.
+     * <p>
+     * This identifier is used for caching and debugging purposes. For base readers,
+     * this typically returns the natural identifier (file path, URL, etc.). For
+     * decorator readers, this should include information about the decoration
+     * (e.g., {@literal memory-cached:file:///path/to/file.dat}).
+     *
+     * @return A unique identifier for this source
+     */
+    String getSourceIdentifier();
 }

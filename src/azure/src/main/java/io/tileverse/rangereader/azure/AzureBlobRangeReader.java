@@ -111,6 +111,11 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
     }
 
     @Override
+    public String getSourceIdentifier() {
+        return blobClient.getBlobUrl();
+    }
+
+    @Override
     public void close() {
         // Azure BlobClient doesn't require explicit closing
     }

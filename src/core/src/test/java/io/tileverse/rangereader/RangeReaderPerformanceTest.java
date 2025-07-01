@@ -88,8 +88,8 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for cached reader
         start = System.currentTimeMillis();
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = CachingRangeReader.builder(
+                        FileRangeReader.builder().path(testFile).build())
                 .build()) {
 
             // Make multiple reads, repeating each one to test cache
@@ -115,8 +115,7 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for combined readers (block-aligned and cached)
         start = System.currentTimeMillis();
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
                         .delegate(FileRangeReader.builder().path(testFile).build())
                         .blockSize(4096)
                         .build())
@@ -164,8 +163,8 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for cached reader
         start = System.currentTimeMillis();
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(HttpRangeReader.builder().uri(httpUri).build())
+        try (RangeReader reader = CachingRangeReader.builder(
+                        HttpRangeReader.builder().uri(httpUri).build())
                 .build()) {
 
             // Make multiple reads, repeating each one to test cache
@@ -184,8 +183,7 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for combined readers (block-aligned and cached)
         start = System.currentTimeMillis();
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
                         .delegate(HttpRangeReader.builder().uri(httpUri).build())
                         .blockSize(16384)
                         .build())

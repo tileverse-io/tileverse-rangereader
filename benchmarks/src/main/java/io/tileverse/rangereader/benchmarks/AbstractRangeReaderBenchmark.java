@@ -243,8 +243,10 @@ public abstract class AbstractRangeReaderBenchmark {
     }
 
     private DiskCachingRangeReader diskCaching(RangeReader baseReader) throws IOException {
-        return new DiskCachingRangeReader(
-                baseReader, tempDir.resolve("disk-cache"), getSourceIndentifier(), diskCacheSize);
+        return DiskCachingRangeReader.builder(baseReader)
+                .cacheDirectory(tempDir.resolve("disk-cache"))
+                .maxCacheSizeBytes(diskCacheSize)
+                .build();
     }
 
     private RangeReader caching(RangeReader baseReader) {

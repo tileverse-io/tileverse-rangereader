@@ -66,7 +66,7 @@ public abstract class AbstractRangeReaderIT {
      * @throws IOException If an error occurs creating the reader
      */
     protected RangeReader createCachingReader() throws IOException {
-        return new CachingRangeReader(createBaseReader());
+        return CachingRangeReader.builder(createBaseReader()).build();
     }
 
     /**
@@ -89,7 +89,8 @@ public abstract class AbstractRangeReaderIT {
      * @throws IOException If an error occurs creating the reader
      */
     protected RangeReader createBlockAlignedCachingReader() throws IOException {
-        CachingRangeReader cachingReader = new CachingRangeReader(createBaseReader());
+        CachingRangeReader cachingReader =
+                CachingRangeReader.builder(createBaseReader()).build();
         return new BlockAlignedRangeReader(cachingReader, DEFAULT_BLOCK_SIZE);
     }
 
@@ -115,7 +116,8 @@ public abstract class AbstractRangeReaderIT {
      * @throws IOException If an error occurs creating the reader
      */
     protected RangeReader createCustomBlockSizeCachingReader(int blockSize) throws IOException {
-        CachingRangeReader cachingReader = new CachingRangeReader(createBaseReader());
+        CachingRangeReader cachingReader =
+                CachingRangeReader.builder(createBaseReader()).build();
         return new BlockAlignedRangeReader(cachingReader, blockSize);
     }
 

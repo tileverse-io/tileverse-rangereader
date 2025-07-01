@@ -129,8 +129,7 @@ public class MinioRangeReaderIT extends AbstractRangeReaderIT {
     @Test
     void testDualBlockSizes() throws IOException {
         // Create RangeReader with different block sizes for memory and disk operations
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
                         .delegate(S3RangeReader.builder()
                                 .uri(URI.create("s3://" + BUCKET_NAME + "/" + KEY_NAME))
                                 .credentialsProvider(credentialsProvider)

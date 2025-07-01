@@ -18,18 +18,18 @@ package io.tileverse.rangereader.cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.RemovalCause;
-import com.github.benmanes.caffeine.cache.RemovalListener;
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
@@ -47,10 +47,27 @@ import org.slf4j.LoggerFactory;
  * can be combined with {@link CachingRangeReader} for a two-level caching
  * strategy (memory + disk).
  * <p>
- * Disk cache entries are stored in the specified cache directory with filenames
- * based on a hash of the source identifier and range. Caffeine's built-in LRU
- * eviction policy is applied when the cache exceeds the configured maximum
- * size.
+ * For optimal performance, consider wrapping this reader with
+ * {@link io.tileverse.rangereader.block.BlockAlignedRangeReader} to ensure that all reads are aligned to
+ * fixed-sized blocks, which can significantly improve cache efficiency and reduce
+ * the number of cache entries by encouraging cache reuse across overlapping ranges.
+ * <p>
+ * Disk cache entries are stored in a subdirectory within the specified cache
+ * directory, where the subdirectory name is based on a hash of the source
+ * identifier. Cache files within the subdirectory use filenames based on the
+ * range offset and length. Caffeine's built-in LRU eviction policy is applied
+ * when the cache exceeds the configured maximum size.
+ * <p>
+ * <strong>Multi-Instance Sharing:</strong> Multiple DiskCachingRangeReader instances
+ * for the same source can share cache files on disk, enabling efficient data sharing.
+ * However, each instance maintains its own internal cache view for concurrency control
+ * and size management. This means:
+ * <ul>
+ * <li>Cache files created by one instance are immediately accessible to other instances</li>
+ * <li>Each instance may report different cache statistics (entry counts, hit rates)</li>
+ * <li>Cache eviction decisions are made independently by each instance</li>
+ * <li>An instance may find "surprise cache hits" from files cached by other instances</li>
+ * </ul>
  * <p>
  * Inspired by DuckDB's cache_httpfs extension.
  */
@@ -59,9 +76,11 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
     private static final Logger logger = LoggerFactory.getLogger(DiskCachingRangeReader.class);
 
     private final RangeReader delegate;
-    private final Path cacheDirectory;
+    private final Path sourceCacheDirectory;
     private final long maxCacheSizeBytes;
     private final String sourceIdentifier;
+    private final boolean deleteOnClose;
+    private final String sourceHash;
 
     // Default cache max size (1GB)
     static final long DEFAULT_MAX_CACHE_SIZE = 1024 * 1024 * 1024;
@@ -70,54 +89,39 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
     private final LoadingCache<CacheKey, Path> cache;
 
     /**
-     * Creates a new DiskCachingRangeReader with the default maximum cache size
-     * (1GB).
-     *
-     * @param delegate         The delegate RangeReader
-     * @param cacheDirectory   The directory to store cached ranges
-     * @param sourceIdentifier A unique identifier for the source (URL, file path,
-     *                         etc.)
-     * @throws IOException If an I/O error occurs
-     */
-    public DiskCachingRangeReader(RangeReader delegate, Path cacheDirectory, String sourceIdentifier)
-            throws IOException {
-        this(delegate, cacheDirectory, sourceIdentifier, DEFAULT_MAX_CACHE_SIZE);
-    }
-
-    /**
      * Creates a new DiskCachingRangeReader that caches ranges from the delegate on
-     * disk.
+     * disk. Package-private constructor - use the builder pattern instead.
      *
-     * @param delegate          The delegate RangeReader
-     * @param cacheDirectory    The directory to store cached ranges
-     * @param sourceIdentifier  A unique identifier for the source (URL, file path,
-     *                          etc.)
-     * @param maxCacheSizeBytes The maximum size of the disk cache in bytes
+     * @param delegate           The delegate RangeReader
+     * @param cacheDirectoryRoot The root directory for caches (a subdirectory will
+     *                           be created)
+     * @param maxCacheSizeBytes  The maximum size of the disk cache in bytes
+     * @param deleteOnClose      Whether to delete cached files when this reader is
+     *                           closed
      * @throws IOException If an I/O error occurs
      */
-    public DiskCachingRangeReader(
-            RangeReader delegate, Path cacheDirectory, String sourceIdentifier, long maxCacheSizeBytes)
+    DiskCachingRangeReader(RangeReader delegate, Path cacheDirectoryRoot, long maxCacheSizeBytes, boolean deleteOnClose)
             throws IOException {
-        this.delegate = Objects.requireNonNull(delegate, "Delegate RangeReader cannot be null");
-        this.cacheDirectory = Objects.requireNonNull(cacheDirectory, "Cache directory cannot be null");
-        this.sourceIdentifier = Objects.requireNonNull(sourceIdentifier, "Source identifier cannot be null");
-        this.maxCacheSizeBytes = maxCacheSizeBytes > 0 ? maxCacheSizeBytes : DEFAULT_MAX_CACHE_SIZE;
 
-        // Create the cache directory if it doesn't exist
-        Files.createDirectories(cacheDirectory);
+        this.delegate = Objects.requireNonNull(delegate, "Delegate RangeReader cannot be null");
+        Objects.requireNonNull(cacheDirectoryRoot, "Cache directory cannot be null");
+        this.sourceIdentifier = delegate.getSourceIdentifier();
+        if (maxCacheSizeBytes <= 0) {
+            throw new IllegalArgumentException("Max cache size must be positive: " + maxCacheSizeBytes);
+        }
+        this.maxCacheSizeBytes = maxCacheSizeBytes;
+        this.deleteOnClose = deleteOnClose;
+        this.sourceHash = computeSourceHash();
+        this.sourceCacheDirectory = cacheDirectoryRoot.resolve(sourceHash);
+
+        // Create the source-specific cache directory if it doesn't exist
+        Files.createDirectories(sourceCacheDirectory);
 
         // Initialize the Caffeine cache with weight-based eviction and loading function
         this.cache = Caffeine.newBuilder()
                 .maximumWeight(this.maxCacheSizeBytes)
-                .weigher((CacheKey key, Path path) -> {
-                    try {
-                        return (int) Math.min(Integer.MAX_VALUE, Files.size(path));
-                    } catch (IOException e) {
-                        // If we can't get the file size, assume it's gone and return 0
-                        return 0;
-                    }
-                })
-                .removalListener(new CacheFileRemovalListener())
+                .weigher(this::weighCacheEntry)
+                .removalListener(this::onCacheFileRemoval)
                 .recordStats()
                 .build(this::loadFromDelegate);
 
@@ -127,48 +131,73 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
 
     @Override
     protected int readRangeNoFlip(final long offset, final int actualLength, ByteBuffer target) throws IOException {
+        // Skip caching for ranges larger than the entire cache
+        if (actualLength > maxCacheSizeBytes) {
+            logger.debug(
+                    "Range too large to cache: {} bytes (max: {}), reading directly from delegate",
+                    actualLength,
+                    maxCacheSizeBytes);
+            return fallbackToDelegate(offset, actualLength, target);
+        }
+
         // Create cache key for this range
         CacheKey key = new CacheKey(sourceIdentifier, offset, actualLength);
 
         try {
-            // Use the Caffeine loading function to get or load the cache entry
+            // Use Caffeine for concurrency control and cache management,
+            // but always read from disk files to enable sharing between instances
             Path cachePath = cache.get(key);
 
-            // Read from the cache file
-            try (RandomAccessFile file = new RandomAccessFile(cachePath.toFile(), "r");
-                    FileChannel channel = file.getChannel()) {
+            // Read from the cache file directly into the target buffer
+            return readFromCacheFile(cachePath, target);
 
-                long fileSize = channel.size();
+        } catch (NoSuchFileException fileDeleted) {
+            // Cache file was deleted externally - invalidate and re-cache
+            logger.debug("Cache file deleted externally, re-caching: key={}", key);
+            cache.invalidate(key);
 
-                // Read directly into the target buffer
-                int bytesRead = (int) Math.min(fileSize, target.remaining());
-                int totalRead = 0;
-                while (totalRead < bytesRead) {
-                    int read = channel.read(target);
-                    if (read == -1) {
-                        break; // End of file
-                    }
-                    totalRead += read;
-                }
-                return totalRead;
-            } catch (FileNotFoundException deletedExternally) {
-                // re-fetch
-                logger.debug("Cache file deleted, re-fetching: key={}", key);
-                cache.invalidate(key);
-                Path path = loadFromDelegate(key);
-                cache.put(key, path);
-                return readRangeNoFlip(offset, actualLength, target);
-            }
+            // Re-load from delegate which will create a new cache file
+            Path newCachePath = cache.get(key);
+            return readFromCacheFile(newCachePath, target);
 
         } catch (Exception e) {
-            logger.warn("Failed to read from cache: key={}", key, e);
+            logger.warn("Failed to read from cache: key={}, reading directly from delegate", key, e);
             // Fallback to direct delegate read if cache access fails
-            int readCount = delegate.readRange(offset, actualLength, target);
-            // readRangeNoFlip shall return the non-flipped buffer, but delegate.readRange
-            // returns it flipped
-            target.position(target.limit());
-            return readCount;
+            return fallbackToDelegate(offset, actualLength, target);
         }
+    }
+
+    /**
+     * Reads data from a cache file into the target buffer.
+     * This method enables file-level sharing between multiple DiskCachingRangeReader instances.
+     *
+     * @param cachePath the path to the cache file
+     * @param target the target buffer to read into
+     * @return the number of bytes read
+     * @throws IOException if an I/O error occurs
+     */
+    private int readFromCacheFile(Path cachePath, ByteBuffer target) throws IOException {
+        try (FileChannel channel = FileChannel.open(cachePath, StandardOpenOption.READ)) {
+            long fileSize = channel.size();
+            final int bytesToRead = (int) Math.min(fileSize, target.remaining());
+            int totalRead = 0;
+            while (totalRead < bytesToRead) {
+                int read = channel.read(target);
+                if (read == -1) {
+                    break; // End of file
+                }
+                totalRead += read;
+            }
+            return totalRead;
+        }
+    }
+
+    private int fallbackToDelegate(final long offset, final int actualLength, ByteBuffer target) throws IOException {
+        int readCount = delegate.readRange(offset, actualLength, target);
+        // readRangeNoFlip shall return the non-flipped buffer, but delegate.readRange
+        // returns it flipped
+        target.position(target.limit());
+        return readCount;
     }
 
     @Override
@@ -177,16 +206,36 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
     }
 
     @Override
+    public String getSourceIdentifier() {
+        return "disk-cached:" + delegate.getSourceIdentifier();
+    }
+
+    @Override
     public void close() throws IOException {
-        delegate.close();
+        try {
+            if (deleteOnClose) {
+                deleteCacheFiles();
+            }
+        } finally {
+            delegate.close();
+        }
     }
 
     /**
-     * Gets the current size of the disk cache in bytes.
+     * Gets the current number of entries in the cache.
      *
-     * @return The current cache size
+     * @return The number of cached entries
      */
-    public long getCurrentCacheSize() {
+    long getCacheEntryCount() {
+        return cache.estimatedSize();
+    }
+
+    /**
+     * Gets the estimated cache size in bytes.
+     *
+     * @return The estimated cache size in bytes
+     */
+    long getEstimatedCacheSizeBytes() {
         return cache.asMap().keySet().stream().mapToLong(CacheKey::length).sum();
     }
 
@@ -195,34 +244,69 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      *
      * @return The maximum cache size
      */
-    public long getMaxCacheSize() {
+    long getMaxCacheSize() {
         return maxCacheSizeBytes;
     }
 
     /**
-     * Gets the number of entries in the cache.
+     * Gets the cache statistics.
      *
-     * @return The number of cache entries
+     * @return The cache statistics
      */
-    public long getCacheEntryCount() {
-        return cache.estimatedSize();
+    public CacheStats getCacheStats() {
+        com.github.benmanes.caffeine.cache.stats.CacheStats caffeineStats = cache.stats();
+        long entryCount = cache.estimatedSize();
+        long estimatedSizeBytes = getEstimatedCacheSizeBytes();
+
+        return CacheStats.fromCaffeine(caffeineStats, entryCount, estimatedSizeBytes);
     }
 
     /**
-     * Gets cache statistics.
-     *
-     * @return A string representation of the cache statistics
-     */
-    public String getCacheStats() {
-        return cache.stats().toString();
-    }
-
-    /**
-     * Clears the disk cache, removing all cached entries.
+     * Clears the disk cache, removing all cached entries and their corresponding cache files.
+     * <p>
+     * This method invalidates all entries in the cache and triggers the removal listener
+     * to delete the associated cache files from disk. After this method completes,
+     * all cache files known to this reader instance will have been removed from the
+     * file system.
+     * <p>
+     * Note: If multiple DiskCachingRangeReader instances share the same cache directory
+     * and source, this will only remove cache files known to this specific instance.
+     * Cache files created by other instances may remain on disk.
      */
     public void clearCache() {
         cache.invalidateAll();
         cache.cleanUp();
+    }
+
+    /**
+     * Deletes all cache files for this source by removing the entire
+     * source-specific cache subdirectory. This removes both cached entries and
+     * their corresponding files on disk.
+     */
+    private void deleteCacheFiles() {
+
+        // First, invalidate all cache entries to trigger cleanup
+        cache.invalidateAll();
+        cache.cleanUp();
+
+        // Delete the entire source-specific cache directory
+        try {
+            if (Files.isDirectory(sourceCacheDirectory)) {
+                try (Stream<Path> files = Files.walk(sourceCacheDirectory)) {
+                    files.sorted((a, b) -> b.compareTo(a)) // Delete files before directories
+                            .forEach(path -> {
+                                try {
+                                    Files.deleteIfExists(path);
+                                    logger.debug("Deleted cache path: {}", path);
+                                } catch (IOException e) {
+                                    logger.warn("Failed to delete cache path: {}", path, e);
+                                }
+                            });
+                }
+            }
+        } catch (IOException e) {
+            logger.warn("Failed to delete source cache directory: {}", sourceCacheDirectory, e);
+        }
     }
 
     /**
@@ -231,30 +315,27 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @throws IOException If an I/O error occurs
      */
     private void initializeCacheFromDisk() throws IOException {
-        // Use the source hash as a prefix for our cache files
-        String sourceHash = getSourceHash();
-
-        // Scan the cache directory for cache files
-        try (Stream<Path> files = Files.list(cacheDirectory)) {
-            files.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().startsWith(sourceHash))
-                    .forEach(p -> {
-                        try {
-                            // Parse the filename to extract offset and length
-                            CacheKey key = parseCacheKey(p.getFileName().toString());
-                            if (key != null) {
-                                // Add to the cache
-                                cache.put(key, p);
-                            }
-                        } catch (Exception e) {
-                            logger.warn("Failed to process cache file: {}", p, e);
+        // Scan the source-specific cache directory for cache files
+        if (Files.exists(sourceCacheDirectory)) {
+            try (Stream<Path> files = Files.list(sourceCacheDirectory)) {
+                files.filter(Files::isRegularFile).forEach(p -> {
+                    try {
+                        // Parse the filename to extract offset and length
+                        CacheKey key = parseCacheKey(p.getFileName().toString());
+                        if (key != null) {
+                            // Add to the cache
+                            cache.put(key, p);
                         }
-                    });
+                    } catch (Exception e) {
+                        logger.warn("Failed to process cache file: {}", p, e);
+                    }
+                });
+            }
         }
 
         if (logger.isInfoEnabled()) {
             long count = cache.estimatedSize();
-            long size = this.getCurrentCacheSize();
+            long size = this.getEstimatedCacheSizeBytes();
             logger.info("Initialized disk cache with {} entries, total size: {} bytes", count, size);
         }
     }
@@ -269,12 +350,6 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      */
     private Path loadFromDelegate(CacheKey key) throws IOException {
         logger.debug("Cache miss for key: offset={}, length={}", key.offset, key.length);
-
-        // Skip caching if the range is larger than the entire cache
-        if (key.length > maxCacheSizeBytes) {
-            logger.debug("Range too large to cache: {} bytes (max: {})", key.length, maxCacheSizeBytes);
-            throw new IOException("Range too large to cache");
-        }
 
         // Read the data from the delegate
         ByteBuffer buffer = ByteBuffer.allocate(key.length);
@@ -293,8 +368,11 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
 
         // Generate a stable file name based on the key (after potential update from
         // partial read)
-        String cacheFileName = String.format("%s_%d_%d.bin", getSourceHash(), key.offset, key.length);
-        Path cachePath = cacheDirectory.resolve(cacheFileName);
+        String cacheFileName = String.format("%d_%d.range", key.offset, key.length);
+        Path cachePath = sourceCacheDirectory.resolve(cacheFileName);
+
+        // Ensure the source cache directory exists before writing
+        Files.createDirectories(sourceCacheDirectory);
 
         // Write the data to the cache file
         try (RandomAccessFile file = new RandomAccessFile(cachePath.toFile(), "rw");
@@ -315,11 +393,29 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
     }
 
     /**
+     * Weighs a cache entry for Caffeine's eviction policy based on file size.
+     * Since we validate that cache entries don't exceed Integer.MAX_VALUE,
+     * we can safely cast to int.
+     *
+     * @param key  The cache key
+     * @param path The path to the cached file
+     * @return The weight of the cache entry (file size in bytes)
+     */
+    private int weighCacheEntry(CacheKey key, Path path) {
+        try {
+            return (int) Files.size(path);
+        } catch (IOException e) {
+            // If we can't get the file size, assume it's gone and return 0
+            return 0;
+        }
+    }
+
+    /**
      * Computes a hash of the source identifier for use in cache file names.
      *
      * @return A hash string for the source
      */
-    private String getSourceHash() {
+    private String computeSourceHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("MD5");
             byte[] hash = digest.digest(sourceIdentifier.getBytes(StandardCharsets.UTF_8));
@@ -342,13 +438,13 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      */
     private CacheKey parseCacheKey(String fileName) {
         String[] parts = fileName.split("_");
-        if (parts.length < 3) {
+        if (parts.length < 2) {
             return null;
         }
 
         try {
-            long offset = Long.parseLong(parts[1]);
-            int length = Integer.parseInt(parts[2].replace(".bin", ""));
+            long offset = Long.parseLong(parts[0]);
+            int length = Integer.parseInt(parts[1].replace(".range", ""));
             return new CacheKey(sourceIdentifier, offset, length);
         } catch (NumberFormatException e) {
             return null;
@@ -366,69 +462,65 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
     }
 
     /**
-     * Removal listener to delete cache files when they are evicted from the cache.
+     * Handles cache file removal when entries are evicted from the cache.
+     *
+     * @param key The cache key
+     * @param path The path to the cache file
+     * @param cause The reason for removal
      */
-    private class CacheFileRemovalListener implements RemovalListener<CacheKey, Path> {
-        @Override
-        public void onRemoval(CacheKey key, Path path, @NonNull RemovalCause cause) {
-            if (path != null) {
-                try {
-                    // Update metrics before deleting
-                    if (Files.exists(path)) {
-                        Files.delete(path);
-                    }
-                    logger.debug("Removed from disk cache: path={}, cause={}", path, cause);
-                } catch (IOException e) {
-                    logger.warn("Failed to delete cache file: {}", path, e);
-                }
+    private void onCacheFileRemoval(CacheKey key, Path path, @NonNull RemovalCause cause) {
+        if (path != null && Files.isRegularFile(path)) {
+            try {
+                Files.delete(path);
+                logger.debug("Removed from disk cache: path={}, cause={}", path, cause);
+            } catch (NoSuchFileException alreadyRemoved) {
+                logger.debug("File already removed from disk cache: path={}, cause={}", path, cause);
+            } catch (IOException e) {
+                logger.warn("Failed to delete cache file: {}", path, e);
             }
         }
     }
 
     /**
-     * Creates a new builder for DiskCachingRangeReader.
+     * Creates a new builder for DiskCachingRangeReader with the mandatory delegate parameter.
      *
-     * @return a new builder instance
+     * @param delegate the delegate RangeReader to wrap with disk caching
+     * @return a new builder instance with the delegate set
      */
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(RangeReader delegate) {
+        return new Builder(delegate);
     }
 
     /**
      * Builder for DiskCachingRangeReader.
      */
     public static class Builder {
-        private RangeReader delegate;
+        private final RangeReader delegate;
         private Path cacheDirectory;
-        private String sourceIdentifier;
-        private long maxCacheSizeBytes = DEFAULT_MAX_CACHE_SIZE;
+        private Long maxCacheSizeBytes;
+        private boolean deleteOnClose = false;
 
-        private Builder() {}
-
-        /**
-         * Sets the delegate RangeReader to wrap with disk caching.
-         *
-         * @param delegate the delegate RangeReader
-         * @return this builder
-         */
-        public Builder delegate(RangeReader delegate) {
+        private Builder(RangeReader delegate) {
             this.delegate = Objects.requireNonNull(delegate, "Delegate cannot be null");
-            return this;
         }
 
         /**
-         * Sets the cache directory.
+         * Sets the cache directory. If not set, defaults to a subdirectory
+         * {@literal tileverse-rangereader-cache} in the system temporary directory.
          *
-         * @param cacheDirectory the directory to store cached files
+         * @param cacheDirectoryRoot the root directory for caches (a subdirectory will
+         *                           be created)
          * @return this builder
          */
-        public Builder cacheDirectory(Path cacheDirectory) {
-            this.cacheDirectory = Objects.requireNonNull(cacheDirectory, "Cache directory cannot be null");
+        public Builder cacheDirectory(Path cacheDirectoryRoot) {
+            this.cacheDirectory = Objects.requireNonNull(cacheDirectoryRoot, "Cache directory cannot be null");
             return this;
         }
 
         /**
-         * Sets the cache directory from a string path.
+         * Sets the cache directory from a string path. If not set, defaults to a
+         * subdirectory {@literal tileverse-rangereader-cache} in the system temporary
+         * directory.
          *
          * @param cacheDirectoryPath the directory path as a string
          * @return this builder
@@ -436,17 +528,6 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         public Builder cacheDirectory(String cacheDirectoryPath) {
             Objects.requireNonNull(cacheDirectoryPath, "Cache directory path cannot be null");
             this.cacheDirectory = Paths.get(cacheDirectoryPath);
-            return this;
-        }
-
-        /**
-         * Sets the source identifier for cache key generation.
-         *
-         * @param sourceIdentifier the source identifier
-         * @return this builder
-         */
-        public Builder sourceIdentifier(String sourceIdentifier) {
-            this.sourceIdentifier = Objects.requireNonNull(sourceIdentifier, "Source identifier cannot be null");
             return this;
         }
 
@@ -465,24 +546,43 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         }
 
         /**
+         * Sets whether to delete cached files when the reader is closed. This is useful
+         * for temporary caching scenarios where you want to clean up after processing
+         * is complete.
+         *
+         * @param deleteOnClose true to delete cached files on close, false to keep them
+         * @return this builder
+         */
+        public Builder deleteOnClose(boolean deleteOnClose) {
+            this.deleteOnClose = deleteOnClose;
+            return this;
+        }
+
+        /**
+         * Configures the reader to delete cached files when closed. This is equivalent
+         * to calling {@code deleteOnClose(true)}.
+         *
+         * @return this builder
+         */
+        public Builder deleteOnClose() {
+            return deleteOnClose(true);
+        }
+
+        /**
          * Builds the DiskCachingRangeReader.
          *
          * @return a new DiskCachingRangeReader instance
-         * @throws IOException if an error occurs during construction
+         * @throws IOException           if an error occurs during construction
          * @throws IllegalStateException if required parameters are not set
          */
         public DiskCachingRangeReader build() throws IOException {
-            if (delegate == null) {
-                throw new IllegalStateException("Delegate RangeReader must be set");
-            }
-            if (cacheDirectory == null) {
-                throw new IllegalStateException("Cache directory must be set");
-            }
-            if (sourceIdentifier == null) {
-                throw new IllegalStateException("Source identifier must be set");
-            }
+            // Use default temporary directory if none specified
+            Path effectiveCacheDirectory = cacheDirectory != null
+                    ? cacheDirectory
+                    : Paths.get(System.getProperty("java.io.tmpdir"), "tileverse-rangereader-cache");
 
-            return new DiskCachingRangeReader(delegate, cacheDirectory, sourceIdentifier, maxCacheSizeBytes);
+            long effectiveMaxCacheSize = maxCacheSizeBytes != null ? maxCacheSizeBytes : DEFAULT_MAX_CACHE_SIZE;
+            return new DiskCachingRangeReader(delegate, effectiveCacheDirectory, effectiveMaxCacheSize, deleteOnClose);
         }
     }
 }

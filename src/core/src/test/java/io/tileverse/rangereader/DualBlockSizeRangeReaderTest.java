@@ -69,13 +69,10 @@ public class DualBlockSizeRangeReaderTest {
     @Test
     void testBuilderWithDifferentBlockSizes() throws IOException {
         // Create a reader with different block sizes using the updated builder
-        RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder()
-                                .delegate(
+        RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
+                        .delegate(DiskCachingRangeReader.builder(
                                         FileRangeReader.builder().path(testFile).build())
                                 .cacheDirectory(cacheDir)
-                                .sourceIdentifier("test-file")
                                 .build())
                         .blockSize(DISK_BLOCK_SIZE)
                         .build())
@@ -109,9 +106,11 @@ public class DualBlockSizeRangeReaderTest {
     void testManualConstructionWithDifferentBlockSizes() throws IOException {
         // Create a reader with different block sizes manually
         RangeReader baseReader = new FileRangeReader(testFile);
-        RangeReader diskCache = new DiskCachingRangeReader(baseReader, cacheDir, SOURCE_ID);
+        RangeReader diskCache = DiskCachingRangeReader.builder(baseReader)
+                .cacheDirectory(cacheDir)
+                .build();
         RangeReader diskBlocks = new BlockAlignedRangeReader(diskCache, DISK_BLOCK_SIZE);
-        RangeReader memCache = new CachingRangeReader(diskBlocks);
+        RangeReader memCache = CachingRangeReader.builder(diskBlocks).build();
         RangeReader memBlocks = new BlockAlignedRangeReader(memCache, MEMORY_BLOCK_SIZE);
 
         // Test reading a range
@@ -138,13 +137,10 @@ public class DualBlockSizeRangeReaderTest {
     @Test
     void testDefaultBlockSizes() throws IOException {
         // Test with default block sizes
-        RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder()
-                                .delegate(
+        RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
+                        .delegate(DiskCachingRangeReader.builder(
                                         FileRangeReader.builder().path(testFile).build())
                                 .cacheDirectory(cacheDir)
-                                .sourceIdentifier("test-file")
                                 .build())
                         .blockSize(BlockAlignedRangeReader.DEFAULT_BLOCK_SIZE)
                         .build())

@@ -42,8 +42,8 @@ import java.util.Objects;
  * <li>{@link S3RangeReader#builder()}</li>
  * <li>{@link AzureBlobRangeReader#builder()}</li>
  * <li>{@link GoogleCloudStorageRangeReader#builder()}</li>
- * <li>{@link CachingRangeReader#builder()}</li>
- * <li>{@link DiskCachingRangeReader#builder()}</li>
+ * <li>{@link CachingRangeReader#builder(RangeReader)}</li>
+ * <li>{@link DiskCachingRangeReader#builder(RangeReader)}</li>
  * <li>{@link BlockAlignedRangeReader#builder()}</li>
  * </ul>
  *
@@ -137,7 +137,7 @@ public class RangeReaderBuilder {
      * @return a CachingRangeReader builder
      */
     public static CachingRangeReader.Builder caching(RangeReader delegate) {
-        return CachingRangeReader.builder().delegate(delegate);
+        return CachingRangeReader.builder(delegate);
     }
 
     /**
@@ -145,15 +145,25 @@ public class RangeReaderBuilder {
      *
      * @param delegate the delegate RangeReader
      * @param cacheDirectory the cache directory
-     * @param sourceIdentifier the source identifier
+     * @param sourceIdentifier the source identifier (deprecated - now determined automatically)
      * @return a DiskCachingRangeReader builder
+     * @deprecated sourceIdentifier is now determined automatically from the delegate
      */
+    @Deprecated
     public static DiskCachingRangeReader.Builder diskCaching(
             RangeReader delegate, Path cacheDirectory, String sourceIdentifier) {
-        return DiskCachingRangeReader.builder()
-                .delegate(delegate)
-                .cacheDirectory(cacheDirectory)
-                .sourceIdentifier(sourceIdentifier);
+        return DiskCachingRangeReader.builder(delegate).cacheDirectory(cacheDirectory);
+    }
+
+    /**
+     * Creates a DiskCachingRangeReader builder.
+     *
+     * @param delegate the delegate RangeReader
+     * @param cacheDirectory the cache directory
+     * @return a DiskCachingRangeReader builder
+     */
+    public static DiskCachingRangeReader.Builder diskCaching(RangeReader delegate, Path cacheDirectory) {
+        return DiskCachingRangeReader.builder(delegate).cacheDirectory(cacheDirectory);
     }
 
     /**
@@ -200,8 +210,8 @@ public class RangeReaderBuilder {
      * @return an optimized RangeReader
      */
     public static RangeReader withOptimizations(RangeReader baseReader) {
-        return CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder().delegate(baseReader).build())
+        return CachingRangeReader.builder(
+                        BlockAlignedRangeReader.builder().delegate(baseReader).build())
                 .build();
     }
 
@@ -210,18 +220,34 @@ public class RangeReaderBuilder {
      *
      * @param baseReader the base reader
      * @param diskCacheDirectory the disk cache directory
-     * @param sourceIdentifier the source identifier for disk caching
+     * @param sourceIdentifier the source identifier for disk caching (deprecated - now determined automatically)
+     * @return a fully cached RangeReader
+     * @throws IOException if an error occurs
+     * @deprecated sourceIdentifier is now determined automatically from the delegate
+     */
+    @Deprecated
+    public static RangeReader withFullCaching(RangeReader baseReader, Path diskCacheDirectory, String sourceIdentifier)
+            throws IOException {
+        return CachingRangeReader.builder(BlockAlignedRangeReader.builder()
+                        .delegate(DiskCachingRangeReader.builder(baseReader)
+                                .cacheDirectory(diskCacheDirectory)
+                                .build())
+                        .build())
+                .build();
+    }
+
+    /**
+     * Creates a RangeReader with comprehensive caching (memory + disk).
+     *
+     * @param baseReader the base reader
+     * @param diskCacheDirectory the disk cache directory
      * @return a fully cached RangeReader
      * @throws IOException if an error occurs
      */
-    public static RangeReader withFullCaching(RangeReader baseReader, Path diskCacheDirectory, String sourceIdentifier)
-            throws IOException {
-        return CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder()
-                                .delegate(baseReader)
+    public static RangeReader withFullCaching(RangeReader baseReader, Path diskCacheDirectory) throws IOException {
+        return CachingRangeReader.builder(BlockAlignedRangeReader.builder()
+                        .delegate(DiskCachingRangeReader.builder(baseReader)
                                 .cacheDirectory(diskCacheDirectory)
-                                .sourceIdentifier(sourceIdentifier)
                                 .build())
                         .build())
                 .build();

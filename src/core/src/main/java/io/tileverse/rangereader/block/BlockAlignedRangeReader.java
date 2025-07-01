@@ -148,74 +148,14 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
         return bytesRead;
     }
 
-    protected int readRangeNoFlipOld(final long offset, final int actualLength, ByteBuffer target) throws IOException {
-
-        // Calculate block-aligned range boundaries
-        long blockMask = blockSize - 1;
-        long alignedOffset = offset & ~blockMask;
-        long endOffset = offset + actualLength;
-        long alignedEndOffset = (endOffset + blockMask) & ~blockMask;
-
-        // Calculate number of blocks we need to read
-        int numBlocks = (int) ((alignedEndOffset - alignedOffset) / blockSize);
-        if (numBlocks == 0) {
-            numBlocks = 1; // At least one block
-        }
-
-        // Position tracking for partial blocks
-        int bytesRemaining = actualLength;
-
-        // Keep a small working buffer to read blocks
-        final ByteBuffer blockBuffer = ByteBuffer.allocate(blockSize);
-
-        // Read each block individually
-        for (int i = 0; i < numBlocks && bytesRemaining > 0; i++) {
-            // Calculate the block offset for this iteration
-            long blockOffset = alignedOffset + (i * blockSize);
-
-            // Calculate how much data in this block is relevant to our request
-            long blockEndOffset = blockOffset + blockSize;
-            long readStartOffset = Math.max(blockOffset, offset);
-            long readEndOffset = Math.min(blockEndOffset, endOffset);
-            int blockReadSize = (int) (readEndOffset - readStartOffset);
-
-            if (blockReadSize <= 0) {
-                continue; // Skip this block if it doesn't contain data we need
-            }
-
-            // Read the block from the delegate
-            blockBuffer.reset();
-            int blockRead = delegate.readRange(blockOffset, blockReadSize, blockBuffer);
-
-            // Calculate position within the block for our data
-            int blockPosition = (int) (readStartOffset - blockOffset);
-
-            // Position and limit the buffer to only get the data we want
-            if (blockBuffer.remaining() <= blockPosition) {
-                // We've reached the end of the data
-                break;
-            }
-
-            blockBuffer.position(blockBuffer.position() + blockPosition);
-            int availableInBlock = blockBuffer.remaining();
-            int toCopy = Math.min(blockReadSize, availableInBlock);
-            blockBuffer.limit(blockBuffer.position() + toCopy);
-
-            // Copy this block's contribution to the target
-            target.put(blockBuffer);
-
-            // Update tracking
-            bytesRemaining -= toCopy;
-        }
-
-        // Calculate how many bytes were actually read
-        int bytesRead = actualLength - bytesRemaining;
-        return bytesRead;
-    }
-
     @Override
     public long size() throws IOException {
         return delegate.size();
+    }
+
+    @Override
+    public String getSourceIdentifier() {
+        return "block-aligned[" + blockSize + "]:" + delegate.getSourceIdentifier();
     }
 
     @Override

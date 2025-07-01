@@ -17,11 +17,8 @@ package io.tileverse.rangereader.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalListener;
-import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.block.BlockAlignedRangeReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -29,66 +26,70 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A decorator for RangeReader that adds caching capabilities using Caffeine.
+ * A decorator for RangeReader that adds in-memory caching capabilities using Caffeine.
  * <p>
- * This implementation caches recently accessed byte ranges to improve performance
- * for repeated reads, which is common when accessing the same data ranges multiple times.
+ * This implementation caches recently accessed byte ranges to improve
+ * performance for repeated reads, which is common when accessing the same data
+ * ranges multiple times.
  * <p>
- * For optimal performance, consider wrapping the underlying reader with
- * {@link BlockAlignedRangeReader} to ensure that all reads are aligned to
- * fixed-sized blocks, which can significantly improve cache efficiency.
+ * <strong>Cache Configuration:</strong>
+ * The cache can be configured with explicit size limits for predictable memory usage:
+ * <ul>
+ * <li><strong>Entry-based sizing:</strong> Use {@code maximumSize(long)} to limit the number of cached ranges</li>
+ * <li><strong>Memory-based sizing:</strong> Use {@code maximumWeight(long)} or {@code maxSizeBytes(long)}
+ *     to limit total memory usage (entries are automatically weighted by ByteBuffer capacity)</li>
+ * <li><strong>Adaptive sizing (default):</strong> If no size limits are specified, soft references are used
+ *     automatically, allowing the garbage collector to manage cache size based on memory pressure</li>
+ * </ul>
+ * <p>
+ * <strong>Optional Configuration:</strong>
+ * <ul>
+ * <li><strong>Time-based expiration:</strong> Use {@code expireAfterAccess(duration, unit)} to automatically
+ *     remove entries after a period of inactivity</li>
+ * <li><strong>Memory pressure handling:</strong> Use {@code softValues()} to allow the garbage collector
+ *     to reclaim cache entries when memory is needed</li>
+ * </ul>
+ * <p>
+ * <strong>Usage Examples:</strong>
+ * <pre>{@code
+ * // Adaptive cache (default) - GC manages size automatically
+ * CachingRangeReader reader = CachingRangeReader.builder(delegate)
+ *     .build();
+ *
+ * // Fixed entry-count based cache
+ * CachingRangeReader reader = CachingRangeReader.builder(delegate)
+ *     .maximumSize(1000)
+ *     .build();
+ *
+ * // Fixed memory-size based cache with expiration
+ * CachingRangeReader reader = CachingRangeReader.builder(delegate)
+ *     .maxSizeBytes(64 * 1024 * 1024) // 64MB
+ *     .expireAfterAccess(30, TimeUnit.MINUTES)
+ *     .build();
+ * }</pre>
+ * <p>
+ * <strong>Performance Considerations:</strong>
+ * For optimal performance, consider wrapping this reader with
+ * {@link io.tileverse.rangereader.block.BlockAlignedRangeReader} to ensure that
+ * all reads are aligned to fixed-sized blocks, which can significantly improve
+ * cache efficiency and reduce the number of cache entries by encouraging cache
+ * reuse across overlapping ranges.
  */
 public class CachingRangeReader extends AbstractRangeReader implements RangeReader {
-
-    static final long DEFAULT_MAX_SIZE_BYTES = 1024 * 1024 * 16;
 
     private final RangeReader delegate;
     private final Cache<RangeKey, ByteBuffer> cache;
 
     /**
-     * Creates a new CachingRangeReader with default cache settings.
-     * <p>
-     * The default cache has a maximum size of 50 entries and expires entries after 10 minutes.
+     * Creates a new CachingRangeReader with the provided cache.
+     * Package-private constructor - use the builder pattern instead.
      *
      * @param delegate The underlying RangeReader to delegate to
+     * @param cache    The cache to use for storing byte ranges
      */
-    public CachingRangeReader(RangeReader delegate) {
-        this(delegate, DEFAULT_MAX_SIZE_BYTES);
-    }
-
-    public CachingRangeReader(RangeReader delegate, long cacheMaxSizeBytes) {
-        this(delegate, createCache(cacheMaxSizeBytes));
-    }
-
-    /**
-     * Creates a new CachingRangeReader with a custom Caffeine builder.
-     * <p>
-     * This allows for full customization of the cache behavior, including size limits,
-     * expiration policies, and statistics collection.
-     *
-     * @param delegate The underlying RangeReader to delegate to
-     * @param builder The Caffeine builder to use for creating the cache
-     */
-    public CachingRangeReader(RangeReader delegate, Caffeine<RangeKey, ByteBuffer> builder) {
+    CachingRangeReader(RangeReader delegate, Cache<RangeKey, ByteBuffer> cache) {
         this.delegate = Objects.requireNonNull(delegate, "Delegate RangeReader cannot be null");
-
-        // Add a removal listener to ensure ByteBuffers can be garbage collected
-        RemovalListener<RangeKey, ByteBuffer> removalListener = (key, value, cause) -> {
-            // Nothing special needed for ByteBuffer cleanup
-        };
-
-        this.cache = builder.removalListener(removalListener).build();
-    }
-
-    static Caffeine<RangeKey, ByteBuffer> createCache(long maxSizeBytes) {
-        if (maxSizeBytes <= 0) {
-            throw new IllegalArgumentException("maxSizeBytes must be > 0");
-        }
-        Caffeine<Object, Object> newBuilder =
-                Caffeine.newBuilder().recordStats().expireAfterAccess(10, TimeUnit.MINUTES);
-
-        // Use custom cache size with weighting based on actual ByteBuffer sizes
-        return newBuilder.maximumWeight(maxSizeBytes).weigher((key, value) -> ((ByteBuffer) value).capacity());
+        this.cache = Objects.requireNonNull(cache, "Cache cannot be null");
     }
 
     @Override
@@ -100,7 +101,8 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
         // This handles concurrency correctly and prevents cache stampede
         ByteBuffer cachedBuffer = cache.get(key, this::loadRange);
 
-        // Duplicate the cached buffer to avoid position/limit changes affecting the cached version
+        // Duplicate the cached buffer to avoid position/limit changes affecting the
+        // cached version
         ByteBuffer duplicate = cachedBuffer.duplicate();
 
         // Copy the data from the cached buffer into the target
@@ -131,6 +133,11 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
     }
 
     @Override
+    public String getSourceIdentifier() {
+        return "memory-cached:" + delegate.getSourceIdentifier();
+    }
+
+    @Override
     public void close() throws IOException {
         delegate.close();
         cache.invalidateAll();
@@ -148,8 +155,18 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
      *
      * @return The number of cached entries
      */
-    public long getCacheSize() {
+    long getCacheEntryCount() {
         return cache.estimatedSize();
+    }
+
+    /**
+     * Gets the estimated cache size in bytes.
+     *
+     * @return The estimated cache size in bytes
+     */
+    long getEstimatedCacheSizeBytes() {
+        // Calculate estimated size by summing the capacity of all cached ByteBuffers
+        return cache.asMap().values().stream().mapToLong(ByteBuffer::capacity).sum();
     }
 
     /**
@@ -157,8 +174,12 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
      *
      * @return The cache statistics
      */
-    public CacheStats getStats() {
-        return cache.stats();
+    public CacheStats getCacheStats() {
+        com.github.benmanes.caffeine.cache.stats.CacheStats caffeineStats = cache.stats();
+        long entryCount = cache.estimatedSize();
+        long estimatedSizeBytes = getEstimatedCacheSizeBytes();
+
+        return CacheStats.fromCaffeine(caffeineStats, entryCount, estimatedSizeBytes);
     }
 
     /**
@@ -167,60 +188,137 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
     public record RangeKey(long offset, int length) {}
 
     /**
-     * Creates a new builder for CachingRangeReader.
+     * Creates a new builder for CachingRangeReader with the mandatory delegate
+     * parameter.
      *
-     * @return a new builder instance
+     * @param delegate the delegate RangeReader to wrap with caching
+     * @return a new builder instance with the delegate set
      */
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(RangeReader delegate) {
+        return new Builder(delegate);
     }
 
     /**
-     * Builder for CachingRangeReader.
+     * Builder for CachingRangeReader with configurable cache settings.
      */
     public static class Builder {
-        private RangeReader delegate;
-        private long maxSizeBytes = DEFAULT_MAX_SIZE_BYTES;
+        private final RangeReader delegate;
+        private Long maximumSize;
+        private Long maximumWeight;
+        private Long expireAfterAccessDuration;
+        private TimeUnit expireAfterAccessUnit;
+        private boolean softValues = false;
 
-        private Builder() {}
-
-        /**
-         * Sets the delegate RangeReader to wrap with caching.
-         *
-         * @param delegate the delegate RangeReader
-         * @return this builder
-         */
-        public Builder delegate(RangeReader delegate) {
+        private Builder(RangeReader delegate) {
             this.delegate = Objects.requireNonNull(delegate, "Delegate cannot be null");
-            return this;
         }
 
         /**
-         * Sets the maximum cache size in bytes.
+         * Sets the maximum number of entries the cache can contain.
+         * Cannot be used together with {@link #maximumWeight(long)}.
          *
-         * @param maxSizeBytes the maximum cache size in bytes
+         * @param maximumSize the maximum number of entries
          * @return this builder
          */
-        public Builder maxSizeBytes(long maxSizeBytes) {
-            if (maxSizeBytes <= 0) {
-                throw new IllegalArgumentException("Max size must be positive: " + maxSizeBytes);
+        public Builder maximumSize(long maximumSize) {
+            if (maximumSize <= 0) {
+                throw new IllegalArgumentException("Maximum size must be positive: " + maximumSize);
             }
-            this.maxSizeBytes = maxSizeBytes;
+            if (this.maximumWeight != null) {
+                throw new IllegalStateException("Cannot set both maximumSize and maximumWeight");
+            }
+            this.maximumSize = maximumSize;
             return this;
         }
 
         /**
-         * Builds the CachingRangeReader.
+         * Sets the maximum weight of entries the cache can contain.
+         * When using this method, entries are weighted by their ByteBuffer capacity.
+         * Cannot be used together with {@link #maximumSize(long)}.
+         *
+         * @param maximumWeight the maximum weight in bytes
+         * @return this builder
+         */
+        public Builder maximumWeight(long maximumWeight) {
+            if (maximumWeight <= 0) {
+                throw new IllegalArgumentException("Maximum weight must be positive: " + maximumWeight);
+            }
+            if (this.maximumSize != null) {
+                throw new IllegalStateException("Cannot set both maximumSize and maximumWeight");
+            }
+            this.maximumWeight = maximumWeight;
+            return this;
+        }
+
+        /**
+         * Sets the duration after which entries are automatically removed from the cache
+         * following their last access.
+         *
+         * @param duration the duration
+         * @param unit     the time unit
+         * @return this builder
+         */
+        public Builder expireAfterAccess(long duration, TimeUnit unit) {
+            if (duration <= 0) {
+                throw new IllegalArgumentException("Duration must be positive: " + duration);
+            }
+            this.expireAfterAccessDuration = duration;
+            this.expireAfterAccessUnit = Objects.requireNonNull(unit, "Time unit cannot be null");
+            return this;
+        }
+
+        /**
+         * Enables soft values, allowing the garbage collector to evict entries when memory is needed.
+         * This can help prevent OutOfMemoryError in memory-constrained environments.
+         *
+         * @return this builder
+         */
+        public Builder softValues() {
+            return softValues(true);
+        }
+
+        /**
+         * Enables soft values with the specified setting.
+         *
+         * @param softValues true to enable soft values, false to use strong references
+         * @return this builder
+         */
+        public Builder softValues(boolean softValues) {
+            this.softValues = softValues;
+            return this;
+        }
+
+        /**
+         * Builds the CachingRangeReader with the configured cache settings.
          *
          * @return a new CachingRangeReader instance
-         * @throws IllegalStateException if delegate is not set
          */
         public CachingRangeReader build() {
-            if (delegate == null) {
-                throw new IllegalStateException("Delegate RangeReader must be set");
+            // Start with a base Caffeine builder
+            Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder().recordStats();
+
+            // Configure size limits
+            if (maximumSize != null) {
+                cacheBuilder.maximumSize(maximumSize);
+            } else if (maximumWeight != null) {
+                cacheBuilder.maximumWeight(maximumWeight).weigher((RangeKey key, ByteBuffer value) -> value.capacity());
+            } else {
+                // Default to soft values when no size limit is specified
+                // This prevents OutOfMemoryError while still providing caching benefits
+                cacheBuilder.softValues();
             }
 
-            return new CachingRangeReader(delegate, maxSizeBytes);
+            // Configure expiration (only if explicitly set)
+            if (expireAfterAccessDuration != null && expireAfterAccessUnit != null) {
+                cacheBuilder.expireAfterAccess(expireAfterAccessDuration, expireAfterAccessUnit);
+            }
+
+            // Configure value references
+            if (softValues) {
+                cacheBuilder.softValues();
+            }
+
+            return new CachingRangeReader(delegate, cacheBuilder.build());
         }
     }
 }

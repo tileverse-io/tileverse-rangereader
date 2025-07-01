@@ -102,8 +102,8 @@ public class RangeReaderBuilderTest {
         Files.write(testFile, new byte[100]);
 
         // Build a cached RangeReader
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = CachingRangeReader.builder(
+                        FileRangeReader.builder().path(testFile).build())
                 .build()) {
 
             assertThat(reader).isInstanceOf(CachingRangeReader.class);
@@ -178,8 +178,7 @@ public class RangeReaderBuilderTest {
         Files.write(testFile, new byte[100]);
 
         // Build a RangeReader with both caching and block alignment
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
                         .delegate(FileRangeReader.builder().path(testFile).build())
                         .blockSize(BlockAlignedRangeReader.DEFAULT_BLOCK_SIZE)
                         .build())

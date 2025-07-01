@@ -320,6 +320,11 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     }
 
     @Override
+    public String getSourceIdentifier() {
+        return uri.toString();
+    }
+
+    @Override
     public void close() {
         // HttpClient is self-managed, no explicit close needed
     }

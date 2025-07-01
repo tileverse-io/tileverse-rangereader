@@ -129,7 +129,7 @@ public class RangeReaderDecoratorIT {
         FileRangeReader baseReader = new FileRangeReader(testFile);
 
         // Create caching reader
-        try (CachingRangeReader reader = new CachingRangeReader(baseReader)) {
+        try (CachingRangeReader reader = CachingRangeReader.builder(baseReader).build()) {
             // Read a range
             int offset = 1000;
             int length = 100;
@@ -150,8 +150,8 @@ public class RangeReaderDecoratorIT {
             assertArrayEquals(data1, data2, "Data from the cache should match the original");
 
             // Verify cache stats
-            assertTrue(reader.getCacheSize() > 0, "Cache should contain entries");
-            assertTrue(reader.getStats().hitCount() > 0, "Should have cache hits");
+            assertTrue(reader.getCacheStats().entryCount() > 0, "Cache should contain entries");
+            assertTrue(reader.getCacheStats().hitCount() > 0, "Should have cache hits");
         }
     }
 
@@ -189,8 +189,7 @@ public class RangeReaderDecoratorIT {
     @Test
     void testRangeReaderBuilderWithDecorators() throws IOException {
         // Use the builder to create a reader with both decorators
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
                         .delegate(FileRangeReader.builder().path(testFile).build())
                         .blockSize(CUSTOM_BLOCK_SIZE)
                         .build())
@@ -274,8 +273,7 @@ public class RangeReaderDecoratorIT {
     @Test
     void testRandomizedReads() throws IOException {
         // Create a reader with both caching and block alignment
-        try (RangeReader reader = CachingRangeReader.builder()
-                .delegate(BlockAlignedRangeReader.builder()
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
                         .delegate(FileRangeReader.builder().path(testFile).build())
                         .blockSize(DEFAULT_BLOCK_SIZE)
                         .build())

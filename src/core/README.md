@@ -81,7 +81,7 @@ RangeReader blockAlignedReader = new BlockAlignedRangeReader(diskCachedReader, 6
 
 // Add in-memory caching as the outermost decorator
 // This ensures we cache the aligned blocks, avoiding redundant storage
-RangeReader cachedReader = new CachingRangeReader(blockAlignedReader);
+RangeReader cachedReader = CachingRangeReader.builder(blockAlignedReader).build();
 ```
 
 The order of decorators is important for optimal performance:
@@ -214,7 +214,7 @@ RangeReader diskCache = new DiskCachingRangeReader(
 RangeReader largeBlocks = new BlockAlignedRangeReader(diskCache, 1024 * 1024); // 1MB blocks
 
 // Add memory caching of these large blocks
-RangeReader memoryCache = new CachingRangeReader(largeBlocks);
+RangeReader memoryCache = CachingRangeReader.builder(largeBlocks).build();
 
 // Add 64KB block alignment as the outermost layer for finer-grained client access
 RangeReader smallBlocks = new BlockAlignedRangeReader(memoryCache, 64 * 1024); // 64KB blocks
@@ -265,7 +265,7 @@ public static RangeReader createDualBlockSizeReader(
     
     RangeReader diskCache = new DiskCachingRangeReader(baseReader, cachePath, sourceId);
     RangeReader largeBlocks = new BlockAlignedRangeReader(diskCache, diskBlockSize);
-    RangeReader memoryCache = new CachingRangeReader(largeBlocks);
+    RangeReader memoryCache = CachingRangeReader.builder(largeBlocks).build();
     return new BlockAlignedRangeReader(memoryCache, memoryBlockSize);
 }
 ```

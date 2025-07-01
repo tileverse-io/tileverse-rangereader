@@ -35,6 +35,7 @@ import java.util.Objects;
 public class FileRangeReader extends AbstractRangeReader implements RangeReader {
 
     private final FileChannel channel;
+    private final Path path;
 
     /**
      * Creates a new FileRangeReader for the specified file.
@@ -44,6 +45,7 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
      */
     public FileRangeReader(Path path) throws IOException {
         Objects.requireNonNull(path, "Path cannot be null");
+        this.path = path;
         this.channel = FileChannel.open(path, StandardOpenOption.READ);
     }
 
@@ -76,6 +78,11 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
     public long size() throws IOException {
         // size() is thread-safe in FileChannel
         return channel.size();
+    }
+
+    @Override
+    public String getSourceIdentifier() {
+        return path.toAbsolutePath().toString();
     }
 
     @Override

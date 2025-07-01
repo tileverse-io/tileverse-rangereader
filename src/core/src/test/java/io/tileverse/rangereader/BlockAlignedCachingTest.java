@@ -61,7 +61,7 @@ class BlockAlignedCachingTest {
         fileReader = new FileRangeReader(testFile);
         countingReader = new CountingRangeReader(fileReader);
         blockAlignedReader = new BlockAlignedRangeReader(countingReader, TEST_BLOCK_SIZE);
-        cachingReader = new CachingRangeReader(blockAlignedReader);
+        cachingReader = CachingRangeReader.builder(blockAlignedReader).build();
     }
 
     @AfterEach
@@ -163,6 +163,11 @@ class BlockAlignedCachingTest {
         @Override
         public void close() throws IOException {
             delegate.close();
+        }
+
+        @Override
+        public String getSourceIdentifier() {
+            return delegate.getSourceIdentifier();
         }
 
         public int getReadCount() {

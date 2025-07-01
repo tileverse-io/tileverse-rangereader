@@ -237,7 +237,8 @@ public class RangeReaderBufferTest {
     @Test
     void testCachingRangeReader_TargetBuffer() throws IOException {
         try (FileRangeReader baseReader = new FileRangeReader(testFile);
-                CachingRangeReader reader = new CachingRangeReader(baseReader)) {
+                CachingRangeReader reader =
+                        CachingRangeReader.builder(baseReader).build()) {
 
             // First read to populate cache
             int offset = 10;
@@ -268,7 +269,9 @@ public class RangeReaderBufferTest {
         Files.createDirectories(cacheDir);
 
         try (FileRangeReader baseReader = new FileRangeReader(testFile);
-                DiskCachingRangeReader reader = new DiskCachingRangeReader(baseReader, cacheDir, "test-id")) {
+                DiskCachingRangeReader reader = DiskCachingRangeReader.builder(baseReader)
+                        .cacheDirectory(cacheDir)
+                        .build()) {
 
             // First read to populate cache
             int offset = 15;
@@ -372,7 +375,8 @@ public class RangeReaderBufferTest {
         // Create a multi-level nested reader setup
         FileRangeReader baseReader = new FileRangeReader(testFile);
         BlockAlignedRangeReader blockReader = new BlockAlignedRangeReader(baseReader, 16);
-        CachingRangeReader cachingReader = new CachingRangeReader(blockReader);
+        CachingRangeReader cachingReader =
+                CachingRangeReader.builder(blockReader).build();
 
         try (RangeReader reader = cachingReader) {
             // Test with nested readers

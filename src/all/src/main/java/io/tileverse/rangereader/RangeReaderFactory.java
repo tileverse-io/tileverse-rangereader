@@ -140,11 +140,20 @@ public class RangeReaderFactory {
      * @return A CachingRangeReader that caches ranges read from the delegate
      */
     public static RangeReader createCaching(RangeReader delegate) {
-        return new CachingRangeReader(delegate);
+        return CachingRangeReader.builder(delegate).build();
     }
 
+    /**
+     * Creates a memory-cached RangeReader that wraps another RangeReader with a custom cache size.
+     * <p>
+     * This is a convenience method for creating a CachingRangeReader with a custom maximum cache size.
+     *
+     * @param delegate The RangeReader to wrap with caching
+     * @param maxSize The maximum cache size in bytes
+     * @return A CachingRangeReader that caches ranges read from the delegate
+     */
     public static RangeReader createCaching(RangeReader delegate, long maxSize) {
-        return new CachingRangeReader(delegate, maxSize);
+        return CachingRangeReader.builder(delegate).maximumWeight(maxSize).build();
     }
 
     /**
@@ -182,7 +191,7 @@ public class RangeReaderFactory {
      * @return A CachingRangeReader wrapped around a BlockAlignedRangeReader
      */
     public static RangeReader createBlockAlignedCaching(RangeReader delegate) {
-        return new CachingRangeReader(new BlockAlignedRangeReader(delegate));
+        return CachingRangeReader.builder(new BlockAlignedRangeReader(delegate)).build();
     }
 
     /**
@@ -196,7 +205,8 @@ public class RangeReaderFactory {
      * @return A CachingRangeReader wrapped around a BlockAlignedRangeReader
      */
     public static RangeReader createBlockAlignedCaching(RangeReader delegate, int blockSize) {
-        return new CachingRangeReader(new BlockAlignedRangeReader(delegate, blockSize));
+        return CachingRangeReader.builder(new BlockAlignedRangeReader(delegate, blockSize))
+                .build();
     }
 
     /**
