@@ -121,15 +121,15 @@ test-core-it:
 
 .PHONY: test-s3-it
 test-s3-it:
-	./mvnw verify -pl src/s3 -Dit.test="S3RangeReaderIT" -Dsurefire.skip=true -ntp
+	./mvnw verify -pl src/s3 -Dsurefire.skip=true -ntp
 
 .PHONY: test-azure-it
 test-azure-it:
-	./mvnw verify -pl src/azure -Dit.test="AzureBlobRangeReaderIT" -Dsurefire.skip=true -ntp
+	./mvnw verify -pl src/azure -Dsurefire.skip=true -ntp
 
 .PHONY: test-gcs-it
 test-gcs-it:
-	./mvnw verify -pl src/gcs -Dit.test="GoogleCloudStorageRangeReaderIT" -Dsurefire.skip=true -ntp
+	./mvnw verify -pl src/gcs -Dsurefire.skip=true -ntp
 
 .PHONY: build-benchmarks
 build-benchmarks:

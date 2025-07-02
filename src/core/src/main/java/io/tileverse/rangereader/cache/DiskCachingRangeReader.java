@@ -284,11 +284,6 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * their corresponding files on disk.
      */
     private void deleteCacheFiles() {
-
-        // First, invalidate all cache entries to trigger cleanup
-        cache.invalidateAll();
-        cache.cleanUp();
-
         // Delete the entire source-specific cache directory
         try {
             if (Files.isDirectory(sourceCacheDirectory)) {
@@ -307,6 +302,8 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         } catch (IOException e) {
             logger.warn("Failed to delete source cache directory: {}", sourceCacheDirectory, e);
         }
+        cache.invalidateAll();
+        cache.cleanUp();
     }
 
     /**

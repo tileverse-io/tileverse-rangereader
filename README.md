@@ -22,7 +22,7 @@ Tileverse Range Reader provides a flexible and extensible I/O abstraction layer 
 ### Prerequisites
 
 - Java 17 or higher
-- Maven 4.0.0-rc-4 or higher
+- Maven 3.9 or higher
 
 ### Installation
 
