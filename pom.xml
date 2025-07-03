@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" root="true" xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 http://maven.apache.org/xsd/maven-4.1.0.xsd">
-  <modelVersion>4.1.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.tileverse.rangereader</groupId>
   <artifactId>tileverse-rangereader</artifactId>
@@ -284,8 +284,8 @@
                     <excludedScopes>test</excludedScopes>
                   </dependencyConvergence>
                   <requireMavenVersion>
-                    <version>[4.0.0-rc-4,)</version>
-                    <message>Maven 4.0.0 or newer is required</message>
+                    <version>[3.9.0,)</version>
+                    <message>Maven 3.9.0 or newer is required</message>
                   </requireMavenVersion>
                 </rules>
               </configuration>
@@ -373,6 +373,11 @@
           <artifactId>maven-shade-plugin</artifactId>
           <version>3.6.0</version>
         </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>flatten-maven-plugin</artifactId>
+          <version>1.6.0</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -426,7 +431,7 @@
               <version>2.61.0</version>
             </palantirJavaFormat>
             <licenseHeader>
-              <file>/Users/groldan/git/multiversio/tileverse-io/tileverse-rangereader/license_header.txt</file>
+              <file>${maven.multiModuleProjectDirectory}/license_header.txt</file>
             </licenseHeader>
           </java>
           <upToDateChecking>
@@ -468,6 +473,32 @@
           </execution>
         </executions>
       </plugin>
+
+      <!-- Flatten POM for CI-friendly versioning -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>flatten-maven-plugin</artifactId>
+        <configuration>
+          <updatePomFile>true</updatePomFile>
+          <flattenMode>resolveCiFriendliesOnly</flattenMode>
+        </configuration>
+        <executions>
+          <execution>
+            <id>flatten</id>
+            <goals>
+              <goal>flatten</goal>
+            </goals>
+            <phase>process-resources</phase>
+          </execution>
+          <execution>
+            <id>flatten.clean</id>
+            <goals>
+              <goal>clean</goal>
+            </goals>
+            <phase>clean</phase>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
@@ -485,6 +516,20 @@
         <sortpom.action>verify</sortpom.action>
         <sortpom.verifyFailOn>strict</sortpom.verifyFailOn>
         <sortpom.verifyFail>stop</sortpom.verifyFail>
+      </properties>
+    </profile>
+
+    <!-- Skip formatting plugins in Eclipse to avoid IDE integration issues -->
+    <profile>
+      <id>eclipse-integration</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <properties>
+        <spotless.skip>true</spotless.skip>
+        <sortpom.skip>true</sortpom.skip>
       </properties>
     </profile>
   </profiles>

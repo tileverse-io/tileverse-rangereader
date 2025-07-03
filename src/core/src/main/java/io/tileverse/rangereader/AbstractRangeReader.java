@@ -33,6 +33,17 @@ import java.nio.ByteBuffer;
 public abstract class AbstractRangeReader implements RangeReader {
 
     /**
+     * Creates a new AbstractRangeReader.
+     * <p>
+     * This constructor is provided for subclasses to extend. Subclasses should
+     * implement the {@link #readRangeNoFlip(long, int, ByteBuffer)} method to
+     * provide the actual reading implementation.
+     */
+    protected AbstractRangeReader() {
+        // Default constructor for subclasses
+    }
+
+    /**
      * Reads bytes from the source at the specified offset into the provided target buffer.
      * <p>
      * This method provides the core implementation of range reading with comprehensive

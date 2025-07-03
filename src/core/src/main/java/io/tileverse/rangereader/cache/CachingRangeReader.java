@@ -184,6 +184,9 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
 
     /**
      * Key for caching ranges based on offset and length.
+     *
+     * @param offset the starting position of the range
+     * @param length the number of bytes in the range
      */
     public record RangeKey(long offset, int length) {}
 

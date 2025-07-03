@@ -157,8 +157,15 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
             cache.invalidate(key);
 
             // Re-load from delegate which will create a new cache file
-            Path newCachePath = cache.get(key);
-            return readFromCacheFile(newCachePath, target);
+            // Wrap in try-catch to handle potential race conditions
+            try {
+                Path newCachePath = cache.get(key);
+                return readFromCacheFile(newCachePath, target);
+            } catch (NoSuchFileException stillDeleted) {
+                // File was deleted again or cache creation failed - fall back to delegate
+                logger.debug("Cache file still missing after re-caching, falling back to delegate: key={}", key);
+                return fallbackToDelegate(offset, actualLength, target);
+            }
 
         } catch (Exception e) {
             logger.warn("Failed to read from cache: key={}, reading directly from delegate", key, e);
@@ -284,11 +291,6 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * their corresponding files on disk.
      */
     private void deleteCacheFiles() {
-
-        // First, invalidate all cache entries to trigger cleanup
-        cache.invalidateAll();
-        cache.cleanUp();
-
         // Delete the entire source-specific cache directory
         try {
             if (Files.isDirectory(sourceCacheDirectory)) {
@@ -307,6 +309,8 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         } catch (IOException e) {
             logger.warn("Failed to delete source cache directory: {}", sourceCacheDirectory, e);
         }
+        cache.invalidateAll();
+        cache.cleanUp();
     }
 
     /**
