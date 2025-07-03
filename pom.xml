@@ -15,6 +15,18 @@
     <module>benchmarks</module>
   </modules>
 
+  <scm>
+    <connection>scm:git:https://github.com/tileverse-io/tileverse-rangereader.git</connection>
+    <developerConnection>scm:git:https://github.com/tileverse-io/tileverse-rangereader.git</developerConnection>
+    <tag>HEAD</tag>
+    <url>https://github.com/tileverse-io/tileverse-rangereader</url>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/tileverse-io/tileverse-rangereader/issues</url>
+  </issueManagement>
+
   <properties>
     <!-- CI-friendly version management -->
     <revision>1.0-SNAPSHOT</revision>
