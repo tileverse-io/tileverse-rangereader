@@ -135,6 +135,7 @@ public class MinioRangeReaderIT extends AbstractRangeReaderIT {
                                 .uri(URI.create("s3://" + BUCKET_NAME + "/" + KEY_NAME))
                                 .credentialsProvider(credentialsProvider)
                                 .endpoint(URI.create(minio.getS3URL()))
+                                .region(Region.US_EAST_1)
                                 .forcePathStyle()
                                 .build())
                         .blockSize(16384) // 16KB blocks for disk I/O
