@@ -92,7 +92,6 @@ implementation 'io.tileverse.rangereader:tileverse-rangereader-gcs:1.0-SNAPSHOT'
 | Library Version | Java Version | Maven Version |
 |----------------|--------------|---------------|
 | 1.0.x | 17+ | 3.9+ |
-| 0.9.x | 17+ | 3.6+ |
 
 ## Verify Installation
 
@@ -128,41 +127,6 @@ public class InstallationTest {
 ```
 
 ## Migration Guide
-
-### From Version 0.x to 1.x
-
-Breaking changes and migration steps:
-
-- **Replace `RangeReaderBuilder`**: Use type-specific builders instead
-  ```java
-  // Old (deprecated)
-  RangeReader reader = RangeReaderBuilder.s3(uri).build();
-  
-  // New (recommended)
-  RangeReader reader = S3RangeReader.builder()
-      .uri(uri)
-      .build();
-  ```
-
-- **Update import statements**: Package reorganization
-  ```java
-  // Old imports
-  import io.tileverse.rangereader.RangeReaderBuilder;
-  
-  // New imports  
-  import io.tileverse.rangereader.s3.S3RangeReader;
-  import io.tileverse.rangereader.cache.CachingRangeReader;
-  ```
-
-- **Review caching configuration**: New options available
-  ```java
-  // Enhanced caching options in 1.x
-  var reader = CachingRangeReader.builder(baseReader)
-      .maximumSize(1000)
-      .maxSizeBytes(64 * 1024 * 1024)  // New: memory-based limits
-      .recordStats()                   // New: performance monitoring
-      .build();
-  ```
 
 ### From Other Range Reading Libraries
 

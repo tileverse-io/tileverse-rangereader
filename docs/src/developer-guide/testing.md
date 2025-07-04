@@ -18,14 +18,19 @@ The project employs a multi-layered testing approach:
 Fast tests that verify individual components in isolation:
 
 ```bash
-# Run all unit tests
-./mvnw test
+# Run all unit tests (recommended)
+make test-unit
 
-# Run specific test class
-./mvnw test -Dtest="CachingRangeReaderTest"
+# Module-specific unit tests
+make test-core     # Core module only
+make test-s3       # S3 module only
+make test-azure    # Azure module only
+make test-gcs      # GCS module only
 
-# Run specific test method
-./mvnw test -Dtest="CachingRangeReaderTest#testBasicCaching"
+# Direct Maven commands for specific test classes/methods
+./mvnw test -Dtest="CachingRangeReaderTest"                    # Specific class
+./mvnw test -Dtest="CachingRangeReaderTest#testBasicCaching"   # Specific method
+./mvnw test -pl src/core -Dtest="FileRangeReaderTest"         # Class in specific module
 ```
 
 #### Example Unit Test
@@ -53,15 +58,31 @@ void testBasicFileReading() throws IOException {
 End-to-end tests using TestContainers for realistic scenarios:
 
 ```bash
-# Run all integration tests
-./mvnw test -Dtest="*IT"
+# Run all integration tests (recommended)
+make test-it
 
-# Run S3 integration tests
-./mvnw test -pl src/s3 -Dtest="S3RangeReaderIT"
+# Module-specific integration tests
+make test-core-it  # Core integration tests (HTTP with Nginx)
+make test-s3-it    # S3 integration tests (LocalStack + MinIO)
+make test-azure-it # Azure integration tests (Azurite)
+make test-gcs-it   # GCS integration tests
 
-# Run with TestContainers reuse
+# With TestContainers reuse for faster execution
 export TESTCONTAINERS_REUSE_ENABLE=true
-./mvnw test -Dtest="*IT"
+make test-it
+
+# Direct Maven commands for integration tests
+./mvnw verify -pl src/s3                # All S3 integration tests
+./mvnw verify -pl src/azure             # All Azure integration tests
+./mvnw verify -pl src/core              # All core integration tests
+./mvnw verify                           # All integration tests
+
+# For specific integration test classes (rarely needed)
+./mvnw test -pl src/s3 -Dtest="S3RangeReaderIT"        # Specific S3 test
+./mvnw test -pl src/azure -Dtest="AzureBlobRangeReaderIT" # Specific Azure test
+
+# Note: Module-specific make targets run ALL integration tests in that module
+# This is usually what you want for comprehensive testing
 ```
 
 #### TestContainers Setup
@@ -92,11 +113,13 @@ public class S3RangeReaderIT extends AbstractRangeReaderIT {
 Measure performance characteristics under various conditions:
 
 ```bash
-# Run performance tests
-./mvnw test -Dtest="*PerformanceTest"
+# Run performance tests (recommended)
+make perf-test
 
-# Run with specific parameters
-./mvnw test -Dtest="RangeReaderPerformanceTest" -Dperformance.iterations=1000
+# Direct Maven commands
+./mvnw test -Dtest="*PerformanceTest"                                   # All performance tests
+./mvnw test -Dtest="RangeReaderPerformanceTest" -Dperformance.iterations=1000  # With custom parameters
+./mvnw test -pl src/core -Dtest="*PerformanceTest"                    # Module-specific
 ```
 
 #### Example Performance Test
@@ -339,20 +362,22 @@ public class AbstractRangeReaderIT {
 ### Running Benchmarks
 
 ```bash
-# Build benchmark JAR
-./mvnw package -pl benchmarks
+# Build and run benchmarks (recommended)
+make build-benchmarks  # Build benchmark JAR
+make benchmarks        # Run all benchmarks
 
-# Run all benchmarks
-java -jar benchmarks/target/benchmarks.jar
+# Specific benchmark types
+make benchmarks-file   # Run file-based benchmarks only
+make benchmarks-gc     # Run benchmarks with GC profiling
 
-# Run specific benchmark
-java -jar benchmarks/target/benchmarks.jar FileRangeReader
+# Build cloud benchmarks (requires TestContainers)
+make benchmarks-cloud
 
-# Run with profiling
-java -jar benchmarks/target/benchmarks.jar -prof gc
-
-# Custom parameters
-java -jar benchmarks/target/benchmarks.jar -f 3 -wi 5 -i 10
+# Direct execution
+java -jar benchmarks/target/benchmarks.jar                    # All benchmarks
+java -jar benchmarks/target/benchmarks.jar FileRangeReader    # Specific benchmark
+java -jar benchmarks/target/benchmarks.jar -prof gc           # With profiling
+java -jar benchmarks/target/benchmarks.jar -f 3 -wi 5 -i 10   # Custom parameters
 ```
 
 ### Example Benchmark
@@ -460,7 +485,7 @@ void testWithTempDirectory() throws IOException {
 
 ### GitHub Actions Testing
 
-The project runs comprehensive tests in CI:
+The project runs comprehensive tests in CI using Makefile targets:
 
 ```yaml
 # .github/workflows/pr-validation.yml
@@ -481,16 +506,28 @@ jobs:
     steps:
       - name: Run integration tests
         run: make test-${{ matrix.test-group }}-it
+      
+  quality:
+    steps:
+      - name: Check formatting
+        run: make lint
+      - name: Full verification
+        run: make verify
 ```
 
 ### Test Parallelization
 
 ```bash
-# Parallel test execution
-./mvnw test -Dparallel=classes -DthreadCount=4
-
-# TestContainers reuse for faster execution
+# TestContainers reuse for faster integration tests (recommended)
 export TESTCONTAINERS_REUSE_ENABLE=true
+make test-it
+
+# Module-specific integration tests with reuse
+export TESTCONTAINERS_REUSE_ENABLE=true
+make test-s3-it
+
+# Direct Maven commands for parallel execution
+./mvnw test -Dparallel=classes -DthreadCount=4  # Parallel unit tests
 ```
 
 ## Debugging Tests

@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://docs.tileverse.io/rangereader/
+    about: Check the documentation for usage guides and examples
+  - name: 💬 Discussions
+    url: https://github.com/tileverse-io/tileverse-rangereader/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/tileverse-io/tileverse-rangereader/security/advisories/new
+    about: Report security vulnerabilities privately (for sensitive security issues)
+  - name: 🚀 Performance Benchmarks
+    url: https://tileverse-io.github.io/rangereader-benchmarks/
+    about: View current performance benchmarks and historical trends
+  - name: 📊 Requirement Dashboard
+    url: https://tileverse-io.github.io/rangereader-compliance/
+    about: View current requirement compliance status

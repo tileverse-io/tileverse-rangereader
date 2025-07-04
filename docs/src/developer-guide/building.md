@@ -1,6 +1,8 @@
 # Building
 
-Instructions for building the Tileverse Range Reader library from source.
+Instructions for building the Tileverse Range Reader library from source, including compilation, packaging, code quality, and benchmarks.
+
+For comprehensive testing information, see the **[Testing Guide](testing.md)**.
 
 ## Prerequisites
 
@@ -34,31 +36,54 @@ cd tileverse-rangereader
 ./mvnw package
 ```
 
-### Using the Makefile
+### Using the Makefile (Recommended)
 
-The project includes a Makefile for common tasks:
+The project includes a comprehensive Makefile that wraps Maven commands for common development tasks:
 
 ```bash
-# Clean and compile
-make compile
+# Show all available targets
+make help
 
-# Run unit tests only
-make test-unit
+# Build everything (compile + test)
+make
 
-# Run integration tests
-make test-it
+# Individual build targets
+make clean         # Clean all build artifacts
+make compile       # Compile all modules
+make package       # Build and create JARs
+make install       # Install to local repository
 
-# Run all tests
-make test
+# Code quality
+make format        # Format code (Spotless + SortPOM)
+make lint          # Check code formatting
 
-# Check code formatting and licenses
-make lint
+# Testing
+make test          # Run all tests (unit + integration)
+make test-unit     # Run unit tests only
+make test-it       # Run integration tests only
 
-# Apply code formatting
-make format
+# Module-specific testing
+make test-core     # Core module unit tests
+make test-s3       # S3 module unit tests  
+make test-azure    # Azure module unit tests
+make test-gcs      # GCS module unit tests
 
-# Install to local repository
-make install
+# Module-specific integration tests
+make test-core-it  # Core integration tests
+make test-s3-it    # S3 integration tests
+make test-azure-it # Azure integration tests
+make test-gcs-it   # GCS integration tests
+
+# Benchmarks
+make build-benchmarks # Build benchmark JAR
+make benchmarks      # Run all benchmarks
+make benchmarks-file # Run file-based benchmarks only
+make benchmarks-gc   # Run benchmarks with GC profiling
+
+# Development workflow
+make verify        # Full verification (lint + test)
+make quick-build   # Fast build without tests
+make dev-setup     # Setup development environment
 ```
 
 ## Build Targets
@@ -78,49 +103,28 @@ make install
 
 ### Testing
 
-#### Unit Tests
+For comprehensive testing information including unit tests, integration tests, TestContainers setup, and performance testing, see the **[Testing Guide](testing.md)**.
+
+Quick testing commands:
 
 ```bash
-# All unit tests (excludes *IT.java)
-./mvnw test
+# Run all tests (recommended)
+make test
 
-# Specific module unit tests
-./mvnw test -pl src/core
+# Test categories
+make test-unit     # Unit tests only
+make test-it       # Integration tests only (requires Docker)
+make perf-test     # Performance tests
 
-# Specific test class
-./mvnw test -Dtest="CachingRangeReaderTest"
+# Module-specific testing
+make test-core     # Core module tests
+make test-s3       # S3 module tests
+make test-azure    # Azure module tests
+make test-gcs      # GCS module tests
 
-# Specific test method
-./mvnw test -Dtest="CachingRangeReaderTest#testBasicCaching"
-```
-
-#### Integration Tests
-
-```bash
-# All integration tests (*IT.java)
-./mvnw test -Dtest="*IT"
-
-# Core module integration tests
-./mvnw test -pl src/core -Dtest="*IT"
-
-# S3 integration tests (requires Docker)
-./mvnw test -pl src/s3 -Dtest="S3RangeReaderIT"
-
-# MinIO integration tests
-./mvnw test -pl src/s3 -Dtest="MinioRangeReaderIT"
-
-# Azure integration tests
-./mvnw test -pl src/azure -Dtest="AzureBlobRangeReaderIT"
-```
-
-#### Performance Tests
-
-```bash
-# Run performance tests
-./mvnw test -Dtest="*PerformanceTest"
-
-# Core module performance tests
-./mvnw test -pl src/core -Dtest="RangeReaderPerformanceTest"
+# Direct Maven commands
+./mvnw test        # Unit tests
+./mvnw verify      # All tests (unit + integration)
 ```
 
 ### Packaging
@@ -156,14 +160,23 @@ make install
 The project uses [Spotless](https://github.com/diffplug/spotless) with Palantir Java Format:
 
 ```bash
-# Check formatting
-./mvnw spotless:check
-
-# Apply formatting
-./mvnw spotless:apply
-
-# Using Makefile
+# Apply formatting (recommended)
 make format
+
+# Check formatting without applying changes
+make lint
+
+# Format only Java code
+make format-java
+
+# Format only POM files
+make format-pom
+
+# Direct Maven commands
+./mvnw spotless:apply  # Apply Java formatting
+./mvnw spotless:check  # Check Java formatting
+./mvnw sortpom:sort    # Sort POM files
+./mvnw sortpom:verify  # Check POM formatting
 ```
 
 ### License Headers
@@ -205,30 +218,18 @@ make lint
 
 ## Benchmarks
 
-### Building Benchmarks
+For comprehensive benchmarking information including JMH setup, performance analysis, and benchmark examples, see the **[Testing Guide](testing.md#benchmarks-with-jmh)**.
+
+Quick benchmark commands:
 
 ```bash
-# Build benchmark JAR
-./mvnw package -pl benchmarks
+# Build and run benchmarks
+make build-benchmarks  # Build benchmark JAR
+make benchmarks        # Run all benchmarks
+make benchmarks-gc     # Run with GC profiling
 
-# Build with all benchmark dependencies
-./mvnw package -pl benchmarks -Pall-benchmarks
-```
-
-### Running Benchmarks
-
-```bash
-# Run all benchmarks
+# Direct execution
 java -jar benchmarks/target/benchmarks.jar
-
-# Run specific benchmark
-java -jar benchmarks/target/benchmarks.jar FileRangeReader
-
-# Run with profiling
-java -jar benchmarks/target/benchmarks.jar -prof gc
-
-# Run with custom parameters
-java -jar benchmarks/target/benchmarks.jar -f 3 -wi 5 -i 10
 ```
 
 ## IDE Configuration
@@ -264,26 +265,28 @@ java -jar benchmarks/target/benchmarks.jar -f 3 -wi 5 -i 10
    - File → Import → Existing Maven Projects
    - Select the root directory
 
-2. **Install Spotless Plugin**:
-   - Help → Eclipse Marketplace
-   - Search for "Spotless"
-   - Install "Spotless (code formatter)"
-
-3. **Configure Formatter**:
-   - Window → Preferences → Java → Code Style → Formatter
-   - Import Palantir Java Format settings
+2. **Code Formatting**:
+   - Code formatting is automatically applied via the `spotless-maven-plugin` during Maven builds
+   - Run `make format` or `./mvnw spotless:apply` to format code
+   - The project uses Palantir Java Format (configured in the Maven POM)
+   - No additional Eclipse plugins are required
 
 ### VS Code
 
 1. **Install Extensions**:
    - Extension Pack for Java
-   - Spotless Gradle plugin (if using Gradle)
+   - Maven for Java (usually included in Extension Pack)
 
-2. **Configure Settings** (`.vscode/settings.json`):
+2. **Code Formatting**:
+   - Code formatting is automatically applied via the `spotless-maven-plugin` during Maven builds
+   - Run `make format` or `./mvnw spotless:apply` to format code
+   - The Maven integration will handle code formatting through the build process
+   - For manual formatting in the editor, VS Code will use its built-in Java formatter
+
+3. **Optional Settings** (`.vscode/settings.json`):
    ```json
    {
      "java.configuration.updateBuildConfiguration": "automatic",
-     "java.format.settings.url": "palantir-java-format.xml",
      "java.test.config.vmargs": ["-ea"]
    }
    ```
@@ -331,7 +334,7 @@ src/core/
 ./mvnw clean compile -pl src/all -am
 
 # This module provides:
-# - RangeReaderBuilder (legacy)
+# - RangeReaderBuilder (unified builder)
 # - RangeReaderFactory
 ```
 
@@ -360,32 +363,15 @@ The project uses Maven's CI-friendly versioning:
 
 ## Docker Integration
 
-### TestContainers for Integration Tests
-
-Integration tests use TestContainers for realistic testing:
+Integration tests require Docker for TestContainers. For detailed TestContainers setup, container configurations, and troubleshooting, see the **[Testing Guide](testing.md#testcontainers-integration)**.
 
 ```bash
 # Ensure Docker is running
 docker --version
 
-# Run integration tests (automatically pulls containers)
-./mvnw test -Dtest="*IT"
-
-# Available containers:
-# - LocalStack (S3)
-# - MinIO (S3-compatible)
-# - Azurite (Azure Blob Storage)
-# - Nginx (HTTP authentication testing)
+# Run integration tests
+make test-it
 ```
-
-### Container Requirements
-
-| Test Type | Container | Purpose |
-|-----------|-----------|---------|
-| S3 Tests | `localstack/localstack:3.2.0` | S3 API emulation |
-| MinIO Tests | `minio/minio:latest` | S3-compatible storage |
-| Azure Tests | `mcr.microsoft.com/azure-storage/azurite:latest` | Azure Blob emulation |
-| HTTP Tests | `nginx:alpine` | HTTP server with auth |
 
 ## Troubleshooting Build Issues
 

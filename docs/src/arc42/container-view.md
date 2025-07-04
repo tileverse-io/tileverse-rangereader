@@ -190,7 +190,7 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader {
 **Key Features**:
 - Single dependency for full functionality
 - Unified builder and factory patterns
-- Legacy compatibility layer
+- Unified builder and factory patterns
 
 ```java
 // Unified factory approach
@@ -205,8 +205,7 @@ public class RangeReaderFactory {
     }
 }
 
-// Legacy builder (deprecated but maintained for compatibility)
-@Deprecated
+// Unified builder (in flux until APIs stabilize)
 public class RangeReaderBuilder {
     public static S3Builder s3(URI uri) { /* ... */ }
     public static HttpBuilder http(URI uri) { /* ... */ }
@@ -274,7 +273,7 @@ The modular structure enables **incremental adoption**:
 Each module has **clear boundaries**:
 - **Core**: Foundation and local/HTTP access
 - **Cloud Modules**: Provider-specific implementations
-- **All**: Convenience and legacy compatibility
+- **All**: Convenience module with unified builders and factory
 - **Benchmarks**: Performance analysis (not shipped)
 
 ### Extension Points
