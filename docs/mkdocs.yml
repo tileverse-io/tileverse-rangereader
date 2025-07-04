@@ -1,0 +1,126 @@
+site_name: Tileverse Range Reader Documentation
+site_description: A Java library for reading byte ranges from various data sources
+site_author: Multiversio LLC
+copyright: "&copy; 2025 Multiversio LLC. All rights reserved."
+repo_url: https://github.com/tileverse-io/tileverse-rangereader
+edit_uri: edit/main/docs/src/
+site_url: https://docs.tileverse.io/rangereader/
+docs_dir: src
+
+theme:
+  name: material
+  logo: assets/images/tileverse-logo.svg
+  favicon: assets/images/favicon.ico
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+  
+extra_css:
+  - assets/stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - user-guide/index.md
+    - Installation: user-guide/installation.md
+    - Quick Start: user-guide/quick-start.md
+    - Configuration: user-guide/configuration.md
+    - Authentication: user-guide/authentication.md
+    - Troubleshooting: user-guide/troubleshooting.md
+  - Developer Guide:
+    - developer-guide/index.md
+    - Building: developer-guide/building.md
+    - Architecture: developer-guide/architecture.md
+    - Testing: developer-guide/testing.md
+    - Performance: developer-guide/performance.md
+    - Contributing: developer-guide/contributing.md
+  - Technical Documentation:
+    - arc42/index.md
+    - Introduction: arc42/introduction.md
+    - Context View: arc42/context-view.md
+    - Container View: arc42/container-view.md
+    - Component View: arc42/component-view.md
+    - Runtime View: arc42/runtime-view.md
+    - Deployment View: arc42/deployment-view.md
+    - Crosscutting Concerns: arc42/crosscutting.md
+    - Quality Requirements: arc42/quality-requirements.md
+    - Architecture Decisions: arc42/decisions.md
+    - Risks & Technical Debt: arc42/risks.md
+    - Glossary: arc42/glossary.md
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tileverse-io/tileverse-rangereader
+    - icon: fontawesome/solid/globe
+      link: https://tileverse.io

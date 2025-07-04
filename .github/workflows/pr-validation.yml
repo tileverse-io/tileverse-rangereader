@@ -3,8 +3,14 @@ name: Pull Request Validation
 on:
   pull_request:
     branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   push:
     branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 # cancel in-progress jobs or runs for this workflow for the same pr or branch
 concurrency:
