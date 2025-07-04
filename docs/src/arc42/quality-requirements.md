@@ -12,16 +12,22 @@ graph TD
     QR --> MAIN[Maintainability]
     QR --> PORT[Portability]
     QR --> SEC[Security]
+    QR --> DEPLOY[Deployability]
+    QR --> SCALE[Scalability]
     
     PERF --> PERF1[Response Time]
     PERF --> PERF2[Throughput]
     PERF --> PERF3[Memory Efficiency]
     PERF --> PERF4[Network Optimization]
+    PERF --> PERF5[Concurrent Processing]
+    PERF --> PERF6[Buffer Management]
     
     REL --> REL1[Error Handling]
     REL --> REL2[Network Resilience]
     REL --> REL3[Thread Safety]
     REL --> REL4[Resource Management]
+    REL --> REL5[Cache Consistency]
+    REL --> REL6[Retry Mechanisms]
     
     USAB --> USAB1[API Simplicity]
     USAB --> USAB2[Integration Ease]
@@ -40,6 +46,14 @@ graph TD
     SEC --> SEC1[Authentication]
     SEC --> SEC2[Credential Management]
     SEC --> SEC3[Data Protection]
+    
+    DEPLOY --> DEPLOY1[Maven Central]
+    DEPLOY --> DEPLOY2[Version Management]
+    DEPLOY --> DEPLOY3[Release Automation]
+    
+    SCALE --> SCALE1[Virtual Threads]
+    SCALE --> SCALE2[Parallel Processing]
+    SCALE --> SCALE3[Connection Pooling]
 ```
 
 ## Quality Scenarios
@@ -112,6 +126,50 @@ graph TD
 
 **Justification**: The strategic analysis notes that "All implementations are thread-safe" and emphasizes server environment compatibility.
 
+#### Buffer Management (Priority: 2)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Performance - Memory Efficiency |
+| **Stimulus** | High-frequency application makes thousands of range requests |
+| **Environment** | Memory-sensitive production environment |
+| **Response** | ByteBuffers are pooled and reused efficiently |
+| **Measure** | 90% reduction in buffer allocation overhead vs direct allocation |
+
+**Justification**: Constant creation and disposal of ByteBuffers creates memory pressure and GC overhead in high-throughput scenarios.
+
+#### Virtual Thread Support (Priority: 2)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Performance - Modern Concurrency |
+| **Stimulus** | Application uses Java 21+ virtual threads for high concurrency |
+| **Environment** | High-load server with thousands of concurrent I/O operations |
+| **Response** | Library integrates seamlessly with virtual thread model |
+| **Measure** | Support 10,000+ concurrent virtual thread operations without blocking carrier threads |
+
+**Justification**: Java 21+ virtual threads enable massive concurrency with minimal resource overhead, critical for modern cloud-native applications.
+
+#### Cache Consistency (Priority: 2)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Reliability - Data Consistency |
+| **Stimulus** | Cached data becomes stale due to source updates |
+| **Environment** | Multi-instance deployment with shared cloud storage |
+| **Response** | Cache is invalidated and refreshed automatically |
+| **Measure** | ETag-based validation prevents serving stale data > 95% accuracy |
+
+#### Retry Mechanisms (Priority: 1)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Reliability - Network Resilience |
+| **Stimulus** | Cloud storage returns transient errors (503, 429, network timeout) |
+| **Environment** | Production environment with variable network conditions |
+| **Response** | Requests are retried with exponential backoff and jitter |
+| **Measure** | 99.9% success rate for operations with ≤3 transient failures |
+
 ### Usability Requirements
 
 #### API Simplicity (Priority: 3)
@@ -144,6 +202,16 @@ ByteBuffer data = reader.readRange(offset, length);
 | **Measure** | < 50% of original I/O code needs modification |
 
 **Justification**: The strategic analysis emphasizes reducing "barriers to entry for new format libraries" and enabling libraries to "focus on parsing logic instead of I/O plumbing."
+
+#### Batch Operations (Priority: 3)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Usability - Efficiency |
+| **Stimulus** | Application needs to read multiple ranges efficiently |
+| **Environment** | High-throughput data processing pipeline |
+| **Response** | Multiple ranges are fetched in optimized batch operations |
+| **Measure** | 50% reduction in network requests vs sequential single-range reads |
 
 ### Maintainability Requirements
 
@@ -193,6 +261,87 @@ ByteBuffer data = reader.readRange(offset, length);
 - **Core**: Java 17+, Caffeine, SLF4J only
 - **Cloud modules**: Add single cloud SDK each
 
+#### Version Compatibility (Priority: 2)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Portability - Java Version Support |
+| **Stimulus** | Application requires specific Java version compatibility |
+| **Environment** | Enterprise environments with controlled Java versions |
+| **Response** | Library maintains compatibility across supported versions |
+| **Measure** | Support Java 17+ through Java 24+ (current LTS + 2 versions) |
+
+### Deployability Requirements
+
+#### Maven Central Publishing (Priority: 1)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Deployability - Distribution |
+| **Stimulus** | Developer wants to use library in production project |
+| **Environment** | Standard Maven/Gradle build environment |
+| **Response** | Library is available from Maven Central |
+| **Measure** | All modules published to Maven Central with proper metadata |
+
+**Requirements**:
+- Signed artifacts with GPG keys
+- Complete JavaDoc and source JARs
+- Valid POM metadata (licenses, developers, SCM)
+- Semantic versioning compliance
+- Release notes and migration guides
+
+#### Dependency Management with BOM (Priority: 1)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Deployability - Dependency Management |
+| **Stimulus** | Developer integrates library with existing application dependencies |
+| **Environment** | Enterprise application with complex dependency trees |
+| **Response** | No transitive dependency conflicts occur |
+| **Measure** | BOM prevents 100% of known Netty and Jackson version conflicts |
+
+**Requirements**:
+- Provide `tileverse-rangereader-bom` artifact for dependency management
+- Align Netty versions across AWS S3 and Azure SDKs (critical conflict point)
+- Manage Jackson, SLF4J, and Reactor versions consistently
+- Include dependency convergence enforcement in build
+- Support both Maven and Gradle dependency management
+- Document BOM usage patterns and conflict resolution strategies
+
+**Justification**: Cloud SDKs bring complex transitive dependencies, especially Netty which is used by both AWS and Azure SDKs. Version conflicts can cause runtime failures or performance issues. A BOM ensures consistent versions and eliminates "dependency hell" for users.
+
+#### Release Automation (Priority: 2)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Deployability - Release Process |
+| **Stimulus** | Maintainer creates new release |
+| **Environment** | GitHub Actions CI/CD pipeline |
+| **Response** | Automated build, test, and publish to Maven Central |
+| **Measure** | Zero-touch releases with automated quality gates |
+
+### Scalability Requirements
+
+#### High Concurrency (Priority: 1)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Scalability - Concurrent Load |
+| **Stimulus** | Server handles thousands of simultaneous range requests |
+| **Environment** | Cloud-native microservice with auto-scaling |
+| **Response** | Library scales linearly with concurrent load |
+| **Measure** | Handle 10,000+ concurrent operations with <5% overhead |
+
+#### Connection Pool Management (Priority: 2)
+
+| Aspect | Details |
+|--------|--------|
+| **Quality Attribute** | Scalability - Resource Efficiency |
+| **Stimulus** | Application makes frequent requests to same cloud storage |
+| **Environment** | High-throughput production environment |
+| **Response** | Connections are pooled and reused efficiently |
+| **Measure** | <100 concurrent connections for 1000+ concurrent operations |
+
 ## Quality Trade-offs
 
 ### Performance vs. Memory Usage
@@ -221,6 +370,97 @@ ByteBuffer data = reader.readRange(offset, length);
 - Default: 3 retries with exponential backoff
 - Fast-fail mode: Single attempt for latency-critical scenarios
 - Circuit breaker: Configurable failure thresholds
+
+### New Functional Requirements
+
+#### Multiple Range Requests
+
+**Requirement**: Support efficient batching of multiple range requests.
+
+```java
+// Future API design
+List<Range> ranges = Arrays.asList(
+    new Range(0, 1024),
+    new Range(5000, 2048),
+    new Range(10000, 4096)
+);
+List<ByteBuffer> results = reader.readRanges(ranges);
+```
+
+**Priority**: Medium
+**Justification**: Reduces network overhead for applications that need multiple non-contiguous ranges.
+
+#### SPI-Based Provider Discovery
+
+**Requirement**: Support extensible range reader provider discovery without hardcoded URI scheme detection.
+
+**Details**:
+- Service Provider Interface for custom range reader implementations
+- Auto-discovery of providers from classpath using Java SPI
+- Enhanced `RangeReaderBuilder.fromUri()` with provider delegation
+- Elimination of hardcoded scheme-to-implementation mapping
+
+**Priority**: Medium
+**Justification**: Enables third-party extensions and removes need for `RangeReaderFactory` duplication.
+
+#### ByteBuffer Pool Management
+
+**Requirement**: Provide pooled ByteBuffer management to reduce allocation overhead.
+
+```java
+// Future API design with buffer pooling
+var pool = ByteBufferPool.create()
+    .initialSize(100)
+    .maxSize(1000)
+    .bufferSize(64 * 1024)
+    .build();
+
+var reader = S3RangeReader.builder()
+    .uri(uri)
+    .bufferPool(pool)
+    .build();
+
+try (var pooledBuffer = pool.acquire(length)) {
+    int bytesRead = reader.readRange(offset, length, pooledBuffer.getBuffer());
+    // Process buffer
+    // Buffer automatically returned to pool on close
+}
+```
+
+**Priority**: High
+**Justification**: Constant creation and disposal of ByteBuffers creates significant memory pressure and GC overhead in high-throughput scenarios. A pool provides:
+- **Memory efficiency**: Reuses existing buffers instead of constant allocation
+- **GC pressure reduction**: Fewer objects created and collected
+- **Performance improvement**: Eliminates allocation overhead in critical paths
+- **Size optimization**: Pool can maintain buffers of various sizes
+- **Thread safety**: Pool manages concurrent access to buffers
+
+#### Cache Invalidation with ETags
+
+**Requirement**: Implement ETag-based cache validation for cloud storage.
+
+```java
+var reader = S3RangeReader.builder()
+    .uri(uri)
+    .withETagValidation(true)
+    .cacheValidationInterval(Duration.ofMinutes(5))
+    .build();
+```
+
+**Priority**: Medium
+**Justification**: Ensures cache consistency in multi-instance deployments.
+
+#### Automated Benchmarking
+
+**Requirement**: Continuous performance monitoring and regression detection.
+
+- JMH benchmarks run on every release
+- Performance regression detection (>10% degradation fails build)
+- Historical performance tracking and reporting
+- Cloud provider performance comparison
+
+**Priority**: High
+**Justification**: Maintains performance guarantees across releases.
 
 ## Quality Metrics and Monitoring
 
@@ -251,6 +491,28 @@ ByteBuffer data = reader.readRange(offset, length);
 | **API Coverage** | > 90% | Usage analytics |
 | **Documentation Quality** | < 5% support tickets | Support metrics |
 
+### New Quality Metrics
+
+#### Deployability Metrics
+
+| Metric | Target | Monitoring Method |
+|--------|--------|------------------|
+| **Release Frequency** | Monthly releases | GitHub releases |
+| **Release Success Rate** | > 99% | CI/CD pipeline |
+| **Maven Central Sync** | < 15 minutes | Automated monitoring |
+| **Documentation Coverage** | > 95% API coverage | Automated analysis |
+
+#### Scalability Metrics
+
+| Metric | Target | Monitoring Method |
+|--------|--------|------------------|
+| **Virtual Thread Efficiency** | < 1MB per 1000 threads | JFR profiling |
+| **Connection Pool Utilization** | > 80% efficiency | Connection monitoring |
+| **Batch Operation Efficiency** | 50% fewer requests | Custom metrics |
+| **ETag Validation Accuracy** | > 95% cache consistency | Cache metrics |
+| **Buffer Pool Efficiency** | > 90% reuse rate | Pool monitoring |
+| **GC Pressure Reduction** | 50% fewer allocations | JVM profiling |
+
 ## Acceptance Criteria
 
 For each quality requirement to be considered fulfilled:
@@ -260,5 +522,40 @@ For each quality requirement to be considered fulfilled:
 3. **Usability**: Reference implementations demonstrate API simplicity
 4. **Maintainability**: Extension examples show modular architecture
 5. **Portability**: CI/CD validates all target platforms
+6. **Deployability**: Automated release pipeline with quality gates
+7. **Scalability**: Load testing demonstrates concurrent performance targets
 
-These quality requirements ensure the library can serve as the robust, high-performance foundation that the Java geospatial ecosystem needs while maintaining the simplicity and reliability expected of infrastructure-level components.
+## Requirements Tracking and Verification
+
+### Automated Verification
+
+Each quality requirement includes automated verification:
+
+| Requirement Type | Verification Method | CI/CD Integration |
+|------------------|--------------------|-----------------|
+| **Performance** | JMH benchmarks | Nightly regression tests |
+| **Reliability** | Chaos engineering | Weekly failure injection |
+| **Thread Safety** | Concurrent stress tests | Every build |
+| **Deployability** | Release automation | Every release |
+| **Scalability** | Load testing | Pre-release validation |
+| **Buffer Management** | Memory profiling | Performance test suite |
+
+### GitHub Issue Integration
+
+Quality requirements are tracked through:
+
+- **Requirement Issues**: Each requirement has corresponding GitHub issue
+- **Epic Tracking**: Related requirements grouped in GitHub Projects
+- **Automated Monitoring**: CI/CD creates issues for requirement violations
+- **Periodic Review**: Quarterly requirement review and updates
+
+### Compliance Reporting
+
+Automated reporting provides:
+
+- **Quality Dashboard**: Real-time requirement compliance status
+- **Trend Analysis**: Historical quality metric trends
+- **Violation Tracking**: Automatic issue creation for requirement breaches
+- **Release Readiness**: Automated go/no-go decisions based on quality gates
+
+These comprehensive quality requirements ensure the library can serve as the robust, high-performance foundation that the Java geospatial ecosystem needs while maintaining the simplicity and reliability expected of infrastructure-level components. The automated verification and tracking systems ensure these requirements remain enforceable and measurable throughout the project lifecycle.

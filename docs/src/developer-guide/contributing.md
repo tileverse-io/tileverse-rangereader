@@ -55,7 +55,7 @@ We're actively working toward broader ecosystem adoption:
    ./mvnw test
    
    # Run integration tests (requires Docker)
-   ./mvnw test -Dtest="*IT"
+   ./mvnw verify
    
    # Apply code formatting
    ./mvnw spotless:apply
@@ -278,7 +278,7 @@ git fetch upstream
 git rebase upstream/main
 
 # Run full test suite
-./mvnw clean test -Dtest="*IT"
+./mvnw clean verify
 
 # Check formatting and quality
 ./mvnw validate

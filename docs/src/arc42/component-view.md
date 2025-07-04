@@ -22,7 +22,7 @@ The core module contains the fundamental abstractions and implementations:
 
 The "All" module provides unified access to all functionality through builder and factory patterns:
 
-- **RangeReaderBuilder**: Legacy fluent API for creating configured readers
+- **RangeReaderBuilder**: Unified fluent API for creating configured readers
 - **RangeReaderFactory**: Simple factory for creating readers from URIs
 
 ## Key Design Patterns
@@ -110,7 +110,7 @@ protected abstract int readRangeNoFlip(long offset, int length, ByteBuffer targe
 | Component | Responsibility |
 |-----------|---------------|
 | **Authentication System** | Handle various HTTP authentication mechanisms |
-| **RangeReaderBuilder** | Provide legacy unified builder API |
+| **RangeReaderBuilder** | Provide unified builder API |
 | **RangeReaderFactory** | Create readers from URI strings |
 
 ## Extension Points

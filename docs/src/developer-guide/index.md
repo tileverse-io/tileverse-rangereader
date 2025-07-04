@@ -110,7 +110,7 @@ tileverse-rangereader/
 
 #### All Module (`src/all`)
 
-- **`RangeReaderBuilder`**: Legacy unified builder (deprecated)
+- **`RangeReaderBuilder`**: Unified builder (evolving as APIs stabilize)
 - **`RangeReaderFactory`**: Factory for creating readers from URIs
 
 #### Benchmarks Module (`benchmarks`)
@@ -135,7 +135,7 @@ cd tileverse-rangereader
 ./mvnw test
 
 # Run integration tests
-./mvnw test -Dtest="*IT"
+./mvnw verify
 ```
 
 ### 2. **Code Style and Quality**
@@ -229,7 +229,7 @@ S3RangeReader.builder()
     .build()
 ```
 
-2. **Unified Builder** (legacy):
+2. **Unified Builder** (evolving):
 ```java
 RangeReaderBuilder.s3(uri)
     .withCredentials(credentials)

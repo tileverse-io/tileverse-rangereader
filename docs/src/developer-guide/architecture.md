@@ -146,7 +146,7 @@ S3RangeReader reader = S3RangeReader.builder()
    CachingRangeReader.builder() // Type-specific
    ```
 
-2. **Unified Builder** (legacy):
+2. **Unified Builder** (evolving):
    ```java
    RangeReaderBuilder.s3(uri)      // Generic
        .withCredentials(creds)
