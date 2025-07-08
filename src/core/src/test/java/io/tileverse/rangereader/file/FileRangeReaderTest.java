@@ -473,4 +473,47 @@ public class FileRangeReaderTest {
             sharedReader.close();
         }
     }
+
+    @Test
+    void of_convenienceMethod_equivalentToBuilder() throws IOException {
+        // Create test file
+        Path testFile = tempDir.resolve("convenience-test.txt");
+        String content = "Test content for convenience method";
+        Files.write(testFile, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE);
+
+        // Test convenience method
+        try (FileRangeReader reader1 = FileRangeReader.of(testFile);
+                FileRangeReader reader2 =
+                        FileRangeReader.builder().path(testFile).build()) {
+
+            // Both should have same size
+            assertEquals(reader1.size(), reader2.size());
+
+            // Both should have same source identifier
+            assertEquals(reader1.getSourceIdentifier(), reader2.getSourceIdentifier());
+
+            // Both should read the same content
+            ByteBuffer buffer1 = ByteBuffer.allocate(content.length());
+            ByteBuffer buffer2 = ByteBuffer.allocate(content.length());
+
+            int bytesRead1 = reader1.readRange(0, content.length(), buffer1);
+            int bytesRead2 = reader2.readRange(0, content.length(), buffer2);
+
+            assertEquals(bytesRead1, bytesRead2);
+            assertEquals(buffer1.position(), buffer2.position());
+
+            byte[] data1 = new byte[bytesRead1];
+            byte[] data2 = new byte[bytesRead2];
+            buffer1.get(data1);
+            buffer2.get(data2);
+
+            assertArrayEquals(data1, data2);
+            assertEquals(content, new String(data1, StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
+    void of_withNullPath_throwsNullPointerException() {
+        assertThrows(NullPointerException.class, () -> FileRangeReader.of(null));
+    }
 }

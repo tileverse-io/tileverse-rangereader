@@ -101,6 +101,20 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
     }
 
     /**
+     * Creates a new FileRangeReader for the specified file path.
+     * <p>
+     * This is a convenience method equivalent to:
+     * {@code FileRangeReader.builder().path(path).build()}
+     *
+     * @param path the file path
+     * @return a new FileRangeReader instance
+     * @throws IOException if an error occurs during construction
+     */
+    public static FileRangeReader of(Path path) throws IOException {
+        return builder().path(path).build();
+    }
+
+    /**
      * Builder for FileRangeReader.
      */
     public static class Builder {
