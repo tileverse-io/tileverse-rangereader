@@ -18,6 +18,7 @@ package io.tileverse.rangereader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Abstract base class providing common implementation for {@link RangeReader}.
@@ -31,6 +32,7 @@ import java.time.Duration;
  * handles all the common concerns (validation, EOF handling, buffer preparation)
  * and delegates the actual reading to the abstract {@code readRangeNoFlip} method.
  */
+@Slf4j
 public abstract class AbstractRangeReader implements RangeReader {
 
     /**
@@ -107,10 +109,12 @@ public abstract class AbstractRangeReader implements RangeReader {
             return 0;
         }
 
+        final int remainingBefore = target.remaining();
+
         // Check if target has enough remaining space
-        if (target.remaining() < length) {
+        if (remainingBefore < length) {
             throw new IllegalArgumentException(
-                    "Target buffer has insufficient remaining capacity: " + target.remaining() + " < " + length);
+                    "Target buffer has insufficient remaining capacity: " + remainingBefore + " < " + length);
         }
 
         final long fileSize = size();
@@ -129,30 +133,35 @@ public abstract class AbstractRangeReader implements RangeReader {
         final int initialPosition = target.position();
 
         final long nanoTimeStart = System.nanoTime();
-        final int remainingBefore = target.remaining();
 
         final int readCount = readRangeNoFlip(offset, actualLength, target);
 
-        long nanoTimeEnd = System.nanoTime();
-        long nanos = nanoTimeEnd - nanoTimeStart;
-
-        long millis = Duration.ofNanos(nanos).toMillis();
-        if (millis > 0)
-            System.out.printf(
-                    "[thread %02d] %s.readRange(offset: %d, length: %d, buffer[cap: %d, remaining: %d]), time: %d ms %n",
-                    Thread.currentThread().getId(),
-                    getClass().getSimpleName(),
-                    offset,
-                    length,
-                    target.capacity(),
-                    remainingBefore,
-                    millis);
+        logDuration(offset, length, target, remainingBefore, nanoTimeStart);
 
         // Prepare the buffer for reading by flipping it within the read range
         int newPosition = target.position();
         target.position(initialPosition);
         target.limit(newPosition);
         return readCount;
+    }
+
+    private final void logDuration(
+            long offset, int length, ByteBuffer target, final int remainingBefore, final long nanoTimeStart) {
+        final long nanoTimeEnd = System.nanoTime();
+        final long nanos = nanoTimeEnd - nanoTimeStart;
+        long millis;
+        if (log.isDebugEnabled() && (millis = Duration.ofNanos(nanos).toMillis()) > 0) {
+            log.debug(
+                    "[thread %02d] %s.readRange(offset: %d, length: %d, buffer[cap: %d, remaining: %d]), time: %d ms %n"
+                            .formatted(
+                                    Thread.currentThread().getId(),
+                                    getClass().getSimpleName(),
+                                    offset,
+                                    length,
+                                    target.capacity(),
+                                    remainingBefore,
+                                    millis));
+        }
     }
 
     /**
