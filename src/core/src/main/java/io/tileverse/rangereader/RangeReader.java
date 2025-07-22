@@ -15,9 +15,14 @@
  */
 package io.tileverse.rangereader;
 
+import io.tileverse.imageio.SeekableByteChannelImageInputStream;
+import io.tileverse.rangereader.nio.ByteBufferPool;
+import io.tileverse.rangereader.nio.channels.RangeReaderSeekableByteChannel;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import javax.imageio.stream.ImageInputStream;
 
 /**
  * Interface for reading ranges of bytes from a source.
@@ -37,11 +42,13 @@ public interface RangeReader extends Closeable {
      * <p>
      * This convenience method allocates a new ByteBuffer for each call. For better
      * performance and reduced garbage collection pressure, prefer using
-     * {@link #readRange(long, int, ByteBuffer)} with reusable buffers when possible.
+     * {@link #readRange(long, int, ByteBuffer)} with reusable buffers when possible
+     * (see {@link ByteBufferPool}).
      *
      * @param offset The offset to read from
      * @param length The number of bytes to read
-     * @return A ByteBuffer containing the read bytes, positioned for immediate consumption
+     * @return A ByteBuffer containing the read bytes, positioned for immediate
+     *         consumption
      * @throws IOException              If an I/O error occurs
      * @throws IllegalArgumentException If offset or length is negative
      */
@@ -98,4 +105,12 @@ public interface RangeReader extends Closeable {
      * @return A unique identifier for this source
      */
     String getSourceIdentifier();
+
+    default SeekableByteChannel asByteChannel() {
+        return RangeReaderSeekableByteChannel.of(this);
+    }
+
+    default ImageInputStream asImageInputStream() {
+        return SeekableByteChannelImageInputStream.of(asByteChannel());
+    }
 }

@@ -19,7 +19,9 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import io.tileverse.rangereader.AbstractRangeReader;
+import io.tileverse.rangereader.ByteRange;
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.nio.ByteBufferPool;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -32,7 +34,10 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import lombok.NonNull;
 import org.slf4j.Logger;
@@ -81,12 +86,17 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
     private final String sourceIdentifier;
     private final boolean deleteOnClose;
     private final String sourceHash;
+    private final int blockSize;
+    private final boolean alignToBlocks;
 
     // Default cache max size (1GB)
     static final long DEFAULT_MAX_CACHE_SIZE = 1024 * 1024 * 1024;
 
+    // Default block size (1MB) - good for cloud storage optimization
+    static final int DEFAULT_BLOCK_SIZE = 1024 * 1024;
+
     // Caffeine cache with built-in LRU eviction and size tracking
-    private final LoadingCache<CacheKey, Path> cache;
+    private final LoadingCache<ByteRange, Path> cache;
 
     /**
      * Creates a new DiskCachingRangeReader that caches ranges from the delegate on
@@ -98,9 +108,11 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @param maxCacheSizeBytes  The maximum size of the disk cache in bytes
      * @param deleteOnClose      Whether to delete cached files when this reader is
      *                           closed
+     * @param blockSize          The block size for alignment (0 to disable alignment)
      * @throws IOException If an I/O error occurs
      */
-    DiskCachingRangeReader(RangeReader delegate, Path cacheDirectoryRoot, long maxCacheSizeBytes, boolean deleteOnClose)
+    DiskCachingRangeReader(
+            RangeReader delegate, Path cacheDirectoryRoot, long maxCacheSizeBytes, boolean deleteOnClose, int blockSize)
             throws IOException {
 
         this.delegate = Objects.requireNonNull(delegate, "Delegate RangeReader cannot be null");
@@ -109,8 +121,13 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         if (maxCacheSizeBytes <= 0) {
             throw new IllegalArgumentException("Max cache size must be positive: " + maxCacheSizeBytes);
         }
+        if (blockSize < 0) {
+            throw new IllegalArgumentException("Block size cannot be negative: " + blockSize);
+        }
         this.maxCacheSizeBytes = maxCacheSizeBytes;
         this.deleteOnClose = deleteOnClose;
+        this.blockSize = blockSize;
+        this.alignToBlocks = blockSize > 0;
         this.sourceHash = computeSourceHash();
         this.sourceCacheDirectory = cacheDirectoryRoot.resolve(sourceHash);
 
@@ -131,6 +148,240 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
 
     @Override
     protected int readRangeNoFlip(final long offset, final int actualLength, ByteBuffer target) throws IOException {
+        if (alignToBlocks) {
+            // Handle block-aligned reads by potentially reading from multiple single-block cache entries
+            return readRangeWithBlockAlignment(offset, actualLength, target);
+        } else {
+            // No alignment - cache exactly what was requested
+            return readRangeWithoutAlignment(offset, actualLength, target);
+        }
+    }
+
+    /**
+     * Reads a range with block alignment, potentially spanning multiple single-block cache entries.
+     * Uses parallel loading for multi-block requests to improve performance.
+     */
+    private int readRangeWithBlockAlignment(final long offset, final int actualLength, ByteBuffer target)
+            throws IOException {
+        // Skip caching for individual blocks larger than the entire cache
+        if (blockSize > maxCacheSizeBytes) {
+            logger.debug(
+                    "Block size too large to cache: {} bytes (max: {}), reading directly from delegate",
+                    blockSize,
+                    maxCacheSizeBytes);
+            return fallbackToDelegate(offset, actualLength, target);
+        }
+
+        // Compute which blocks we need
+        List<BlockRequest> blockRequests = computeRequiredBlocks(offset, actualLength, target.remaining());
+
+        if (blockRequests.isEmpty()) {
+            return 0;
+        }
+
+        if (blockRequests.size() == 1) {
+            // Single block - handle directly
+            return readSingleBlock(blockRequests.get(0), target);
+        } else {
+            // Multiple blocks - load in parallel
+            return readBlocksParallel(blockRequests, target);
+        }
+    }
+
+    /**
+     * Computes the block requests needed to satisfy the given range request.
+     */
+    private List<BlockRequest> computeRequiredBlocks(long offset, int actualLength, int targetRemaining) {
+        long currentOffset = offset;
+        int remainingBytes = Math.min(actualLength, targetRemaining);
+        int targetPosition = 0;
+
+        // Calculate the first block request
+        long blockStartOffset = (currentOffset / blockSize) * blockSize;
+        int offsetWithinBlock = (int) (currentOffset - blockStartOffset);
+        int availableInBlock = blockSize - offsetWithinBlock;
+        int bytesFromThisBlock = Math.min(availableInBlock, remainingBytes);
+        int cacheKeySize = computeBlockSize(blockStartOffset);
+
+        ByteRange cacheKey = new ByteRange(blockStartOffset, cacheKeySize);
+        BlockRequest firstRequest = new BlockRequest(cacheKey, offsetWithinBlock, bytesFromThisBlock, targetPosition);
+
+        // Check if we need only one block - optimize for the common case
+        if (bytesFromThisBlock >= remainingBytes) {
+            return List.of(firstRequest);
+        }
+
+        // Multiple blocks needed - use ArrayList
+        List<BlockRequest> requests = new ArrayList<>();
+        requests.add(firstRequest);
+
+        // Move to next block and continue
+        currentOffset += bytesFromThisBlock;
+        remainingBytes -= bytesFromThisBlock;
+        targetPosition += bytesFromThisBlock;
+
+        while (remainingBytes > 0) {
+            // Calculate the block-aligned cache offset for the current position
+            blockStartOffset = (currentOffset / blockSize) * blockSize;
+            offsetWithinBlock = (int) (currentOffset - blockStartOffset);
+
+            // Calculate how many bytes we need from this block
+            availableInBlock = blockSize - offsetWithinBlock;
+            bytesFromThisBlock = Math.min(availableInBlock, remainingBytes);
+
+            // Determine the appropriate cache key size, considering EOF
+            cacheKeySize = computeBlockSize(blockStartOffset);
+
+            // Create block request
+            cacheKey = new ByteRange(blockStartOffset, cacheKeySize);
+            BlockRequest request = new BlockRequest(cacheKey, offsetWithinBlock, bytesFromThisBlock, targetPosition);
+            requests.add(request);
+
+            // Move to next block
+            currentOffset += bytesFromThisBlock;
+            remainingBytes -= bytesFromThisBlock;
+            targetPosition += bytesFromThisBlock;
+        }
+
+        return requests;
+    }
+
+    /**
+     * Computes the appropriate block size for a cache key starting at the given offset.
+     * This accounts for EOF by ensuring the block size doesn't extend beyond the file size.
+     *
+     * @param blockStartOffset the starting offset of the block
+     * @return the appropriate block size (may be less than blockSize if near EOF)
+     */
+    private int computeBlockSize(long blockStartOffset) {
+        try {
+            long fileSize = delegate.size();
+            long maxPossibleSize = fileSize - blockStartOffset;
+
+            // If the full block size fits within the file, use it
+            if (maxPossibleSize >= blockSize) {
+                return blockSize;
+            }
+
+            // Otherwise, use the remaining bytes (but ensure it's positive)
+            return (int) Math.max(0, maxPossibleSize);
+        } catch (IOException e) {
+            // If we can't determine file size, assume full block size
+            logger.debug("Unable to determine file size, using full block size: {}", e.getMessage());
+            return blockSize;
+        }
+    }
+
+    /**
+     * Reads a single block and copies the requested portion to the target buffer.
+     */
+    private int readSingleBlock(BlockRequest request, ByteBuffer target) throws IOException {
+        try {
+            // Use Caffeine for concurrency control and cache management
+            Path cachePath = cache.get(request.key);
+
+            // Check if we need to update the cache key due to partial read (e.g., EOF)
+            if (cachePath != null) {
+                String fileName = cachePath.getFileName().toString();
+                ByteRange actualKey = parseCacheKey(fileName);
+                if (actualKey != null && actualKey.length() != request.key.length()) {
+                    cache.put(actualKey, cachePath);
+                }
+            }
+
+            // Read from the cache file, starting at the offset within the block
+            return readFromCacheFileWithOffset(cachePath, target, request.offsetWithinBlock, request.bytesToRead);
+
+        } catch (NoSuchFileException fileDeleted) {
+            // Cache file was deleted externally - invalidate and re-cache
+            logger.debug("Cache file deleted externally, re-caching: key={}", request.key);
+            cache.invalidate(request.key);
+
+            try {
+                Path newCachePath = cache.get(request.key);
+                return readFromCacheFileWithOffset(
+                        newCachePath, target, request.offsetWithinBlock, request.bytesToRead);
+            } catch (NoSuchFileException stillDeleted) {
+                logger.debug(
+                        "Cache file still missing after re-caching, falling back to delegate: key={}", request.key);
+                return fallbackToDelegate(
+                        request.key.offset() + request.offsetWithinBlock, request.bytesToRead, target);
+            }
+
+        } catch (Exception e) {
+            logger.warn("Failed to read from cache: key={}, falling back to delegate", request.key, e);
+            return fallbackToDelegate(request.key.offset() + request.offsetWithinBlock, request.bytesToRead, target);
+        }
+    }
+
+    /**
+     * Reads multiple blocks in parallel and assembles the result.
+     */
+    private int readBlocksParallel(List<BlockRequest> blockRequests, ByteBuffer target) throws IOException {
+        CompletableFuture<Path>[] futures = new CompletableFuture[blockRequests.size()];
+
+        // Load all blocks in parallel using default ForkJoinPool
+        for (int i = 0; i < blockRequests.size(); i++) {
+            BlockRequest request = blockRequests.get(i);
+            futures[i] = CompletableFuture.supplyAsync(() -> cache.get(request.key));
+        }
+
+        try {
+            // Wait for all blocks to load
+            CompletableFuture.allOf(futures).join();
+
+            // Assemble the result by copying data from each block to the target
+            int totalBytesRead = 0;
+            for (int i = 0; i < blockRequests.size(); i++) {
+                BlockRequest request = blockRequests.get(i);
+                Path cachePath = futures[i].get();
+
+                // Check if we need to update the cache key due to partial read (e.g., EOF)
+                if (cachePath != null) {
+                    String fileName = cachePath.getFileName().toString();
+                    ByteRange actualKey = parseCacheKey(fileName);
+                    if (actualKey != null && actualKey.length() != request.key.length()) {
+                        cache.put(actualKey, cachePath);
+                    }
+                }
+
+                int bytesFromBlock =
+                        readFromCacheFileWithOffset(cachePath, target, request.offsetWithinBlock, request.bytesToRead);
+                totalBytesRead += bytesFromBlock;
+
+                // If we read fewer bytes than expected, we've hit EOF
+                if (bytesFromBlock < request.bytesToRead) {
+                    break;
+                }
+            }
+
+            return totalBytesRead;
+
+        } catch (Exception e) {
+            // Handle any exceptions from the parallel loading
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException("Failed to read blocks in parallel", e);
+        }
+    }
+
+    /**
+     * Represents a request for data from a specific block.
+     */
+    private record BlockRequest(
+            ByteRange key, // The cache key for the block
+            int offsetWithinBlock, // Offset within the block to start reading
+            int bytesToRead, // Number of bytes to read from this block
+            int targetPosition // Position in target buffer (for future use)
+            ) {}
+
+    /**
+     * Reads a range without block alignment, caching exactly what was requested.
+     */
+    private int readRangeWithoutAlignment(final long offset, final int actualLength, ByteBuffer target)
+            throws IOException {
         // Skip caching for ranges larger than the entire cache
         if (actualLength > maxCacheSizeBytes) {
             logger.debug(
@@ -140,36 +391,40 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
             return fallbackToDelegate(offset, actualLength, target);
         }
 
-        // Create cache key for this range
-        CacheKey key = new CacheKey(sourceIdentifier, offset, actualLength);
+        // Create cache key for the exact range
+        ByteRange key = new ByteRange(offset, actualLength);
 
         try {
-            // Use Caffeine for concurrency control and cache management,
-            // but always read from disk files to enable sharing between instances
+            // Use Caffeine for concurrency control and cache management
             Path cachePath = cache.get(key);
 
-            // Read from the cache file directly into the target buffer
-            return readFromCacheFile(cachePath, target);
+            // Check if we need to update the cache key due to partial read
+            if (cachePath != null) {
+                String fileName = cachePath.getFileName().toString();
+                ByteRange actualKey = parseCacheKey(fileName);
+                if (actualKey != null && actualKey.length() != key.length()) {
+                    cache.put(actualKey, cachePath);
+                }
+            }
+
+            // Read from the cache file
+            return readFromCacheFileWithOffset(cachePath, target, 0, actualLength);
 
         } catch (NoSuchFileException fileDeleted) {
             // Cache file was deleted externally - invalidate and re-cache
             logger.debug("Cache file deleted externally, re-caching: key={}", key);
             cache.invalidate(key);
 
-            // Re-load from delegate which will create a new cache file
-            // Wrap in try-catch to handle potential race conditions
             try {
                 Path newCachePath = cache.get(key);
-                return readFromCacheFile(newCachePath, target);
+                return readFromCacheFileWithOffset(newCachePath, target, 0, actualLength);
             } catch (NoSuchFileException stillDeleted) {
-                // File was deleted again or cache creation failed - fall back to delegate
                 logger.debug("Cache file still missing after re-caching, falling back to delegate: key={}", key);
                 return fallbackToDelegate(offset, actualLength, target);
             }
 
         } catch (Exception e) {
             logger.warn("Failed to read from cache: key={}, reading directly from delegate", key, e);
-            // Fallback to direct delegate read if cache access fails
             return fallbackToDelegate(offset, actualLength, target);
         }
     }
@@ -184,9 +439,42 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @throws IOException if an I/O error occurs
      */
     private int readFromCacheFile(Path cachePath, ByteBuffer target) throws IOException {
+        return readFromCacheFileWithOffset(cachePath, target, 0, target.remaining());
+    }
+
+    /**
+     * Reads data from a cache file into the target buffer, starting at a specific offset
+     * within the cache file and reading only the requested length.
+     *
+     * @param cachePath the path to the cache file
+     * @param target the target buffer to read into
+     * @param offsetWithinFile the offset within the cache file to start reading from
+     * @param requestedLength the number of bytes to read
+     * @return the number of bytes read
+     * @throws IOException if an I/O error occurs
+     */
+    private int readFromCacheFileWithOffset(
+            Path cachePath, ByteBuffer target, int offsetWithinFile, int requestedLength) throws IOException {
         try (FileChannel channel = FileChannel.open(cachePath, StandardOpenOption.READ)) {
             long fileSize = channel.size();
-            final int bytesToRead = (int) Math.min(fileSize, target.remaining());
+
+            // Check if the offset is within the file
+            if (offsetWithinFile >= fileSize) {
+                return 0; // Nothing to read
+            }
+
+            // Calculate how many bytes we can actually read
+            long availableFromOffset = fileSize - offsetWithinFile;
+            int bytesToRead = (int) Math.min(Math.min(availableFromOffset, requestedLength), target.remaining());
+
+            if (bytesToRead <= 0) {
+                return 0;
+            }
+
+            // Position the channel at the correct offset
+            channel.position(offsetWithinFile);
+
+            // Read the requested portion
             int totalRead = 0;
             while (totalRead < bytesToRead) {
                 int read = channel.read(target);
@@ -243,7 +531,16 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @return The estimated cache size in bytes
      */
     long getEstimatedCacheSizeBytes() {
-        return cache.asMap().keySet().stream().mapToLong(CacheKey::length).sum();
+        return cache.asMap().values().stream()
+                .distinct() // Avoid double-counting if multiple keys point to same file
+                .mapToLong(path -> {
+                    try {
+                        return Files.size(path);
+                    } catch (IOException e) {
+                        return 0; // File doesn't exist or can't be read
+                    }
+                })
+                .sum();
     }
 
     /**
@@ -325,7 +622,7 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
                 files.filter(Files::isRegularFile).forEach(p -> {
                     try {
                         // Parse the filename to extract offset and length
-                        CacheKey key = parseCacheKey(p.getFileName().toString());
+                        ByteRange key = parseCacheKey(p.getFileName().toString());
                         if (key != null) {
                             // Add to the cache
                             cache.put(key, p);
@@ -352,48 +649,58 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @return Path to the cached file
      * @throws IOException If an I/O error occurs
      */
-    private Path loadFromDelegate(CacheKey key) throws IOException {
-        logger.debug("Cache miss for key: offset={}, length={}", key.offset, key.length);
+    private Path loadFromDelegate(ByteRange key) throws IOException {
+        logger.debug("Cache miss for key: offset={}, length={}", key.offset(), key.length());
 
         // Read the data from the delegate
-        ByteBuffer buffer = ByteBuffer.allocate(key.length);
-        int bytesRead = delegate.readRange(key.offset, key.length, buffer);
+        ByteBufferPool pool = ByteBufferPool.getDefault();
+        ByteBuffer buffer = pool.borrowDirect(key.length());
+        try {
+            int bytesRead = delegate.readRange(key.offset(), key.length(), buffer);
 
-        // It's acceptable to read fewer bytes if we reached EOF
-        if (bytesRead <= 0) {
-            throw new IOException("Failed to read data from delegate reader");
-        }
-
-        // Update the key's length to match what was actually read, if different
-        if (bytesRead != key.length) {
-            logger.debug("Partial read from delegate: requested {} bytes, got {}", key.length, bytesRead);
-            key = new CacheKey(sourceIdentifier, key.offset, bytesRead);
-        }
-
-        // Generate a stable file name based on the key (after potential update from
-        // partial read)
-        String cacheFileName = String.format("%d_%d.range", key.offset, key.length);
-        Path cachePath = sourceCacheDirectory.resolve(cacheFileName);
-
-        // Ensure the source cache directory exists before writing
-        Files.createDirectories(sourceCacheDirectory);
-
-        // Write the data to the cache file
-        try (RandomAccessFile file = new RandomAccessFile(cachePath.toFile(), "rw");
-                FileChannel channel = file.getChannel()) {
-            channel.write(buffer);
-        } catch (IOException e) {
-            // Clean up if we couldn't write
-            try {
-                Files.deleteIfExists(cachePath);
-            } catch (IOException suppressed) {
-                e.addSuppressed(suppressed);
+            // It's acceptable to read fewer bytes if we reached EOF
+            if (bytesRead <= 0) {
+                throw new IOException("Failed to read data from delegate reader");
             }
-            throw e;
-        }
 
-        logger.debug("Added to disk cache: offset={}, length={}, path={}", key.offset, key.length, cachePath);
-        return cachePath;
+            // Update the key's length to match what was actually read, if different
+            if (bytesRead != key.length()) {
+                logger.debug("Partial read from delegate: requested {} bytes, got {}", key.length(), bytesRead);
+                key = new ByteRange(key.offset(), bytesRead);
+            }
+
+            // Generate a stable file name based on the key (after potential update from
+            // partial read)
+            String cacheFileName = computeFileName(key);
+            Path cachePath = sourceCacheDirectory.resolve(cacheFileName);
+
+            // Ensure the source cache directory exists before writing
+            Files.createDirectories(sourceCacheDirectory);
+
+            // Write the data to the cache file
+            try (RandomAccessFile file = new RandomAccessFile(cachePath.toFile(), "rw");
+                    FileChannel channel = file.getChannel()) {
+                channel.write(buffer);
+            } catch (IOException e) {
+                // Clean up if we couldn't write
+                try {
+                    Files.deleteIfExists(cachePath);
+                } catch (IOException suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+                throw e;
+            }
+            logger.debug("Added to disk cache: offset={}, length={}, path={}", key.offset(), key.length(), cachePath);
+            return cachePath;
+        } finally {
+            pool.returnBuffer(buffer);
+        }
+    }
+
+    private String computeFileName(ByteRange key) {
+        long rangeStart = key.offset();
+        long rangeEnd = rangeStart + key.length() - 1;
+        return String.format("%d_%d.range", rangeStart, rangeEnd);
     }
 
     /**
@@ -405,7 +712,7 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @param path The path to the cached file
      * @return The weight of the cache entry (file size in bytes)
      */
-    private int weighCacheEntry(CacheKey key, Path path) {
+    private int weighCacheEntry(ByteRange key, Path path) {
         try {
             return (int) Files.size(path);
         } catch (IOException e) {
@@ -440,28 +747,19 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @param fileName The cache file name
      * @return The parsed cache key, or null if the format is invalid
      */
-    private CacheKey parseCacheKey(String fileName) {
+    private ByteRange parseCacheKey(String fileName) {
         String[] parts = fileName.split("_");
         if (parts.length < 2) {
             return null;
         }
 
         try {
-            long offset = Long.parseLong(parts[0]);
-            int length = Integer.parseInt(parts[1].replace(".range", ""));
-            return new CacheKey(sourceIdentifier, offset, length);
+            long rangeStart = Long.parseLong(parts[0]);
+            long rangeEnd = Long.parseLong(parts[1].replace(".range", ""));
+            int length = (int) (rangeEnd - rangeStart + 1);
+            return new ByteRange(rangeStart, length);
         } catch (NumberFormatException e) {
             return null;
-        }
-    }
-
-    /**
-     * Represents a cache key for identifying a specific byte range.
-     */
-    private static record CacheKey(String sourceIdentifier, long offset, int length) {
-        @Override
-        public String toString() {
-            return "[source: %s, offset: %s, lenght: %s]".formatted(sourceIdentifier, offset, length);
         }
     }
 
@@ -472,7 +770,7 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
      * @param path The path to the cache file
      * @param cause The reason for removal
      */
-    private void onCacheFileRemoval(CacheKey key, Path path, @NonNull RemovalCause cause) {
+    private void onCacheFileRemoval(ByteRange key, Path path, @NonNull RemovalCause cause) {
         if (path != null && Files.isRegularFile(path)) {
             try {
                 Files.delete(path);
@@ -503,6 +801,7 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         private Path cacheDirectory;
         private Long maxCacheSizeBytes;
         private boolean deleteOnClose = false;
+        private Integer blockSize;
 
         private Builder(RangeReader delegate) {
             this.delegate = Objects.requireNonNull(delegate, "Delegate cannot be null");
@@ -573,6 +872,47 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
         }
 
         /**
+         * Sets the block size for internal block alignment. When set, the cache will
+         * align reads to block boundaries for better cache efficiency and reduced
+         * cache fragmentation.
+         * <p>
+         * For example, if block size is 1MB and you request 1 byte at offset 500000,
+         * the cache will read and store the entire 1MB block containing that byte,
+         * but only return the requested 1 byte to the caller.
+         *
+         * @param blockSize the block size in bytes (must be positive, 0 disables alignment)
+         * @return this builder
+         * @throws IllegalArgumentException if blockSize is negative
+         */
+        public Builder blockSize(int blockSize) {
+            if (blockSize < 0) {
+                throw new IllegalArgumentException("Block size cannot be negative: " + blockSize);
+            }
+            this.blockSize = blockSize;
+            return this;
+        }
+
+        /**
+         * Enables block alignment with the default block size (1MB).
+         * This is equivalent to calling {@code blockSize(DEFAULT_BLOCK_SIZE)}.
+         *
+         * @return this builder
+         */
+        public Builder withBlockAlignment() {
+            return blockSize(DEFAULT_BLOCK_SIZE);
+        }
+
+        /**
+         * Disables block alignment by setting block size to 0.
+         * This is equivalent to calling {@code blockSize(0)}.
+         *
+         * @return this builder
+         */
+        public Builder withoutBlockAlignment() {
+            return blockSize(0);
+        }
+
+        /**
          * Builds the DiskCachingRangeReader.
          *
          * @return a new DiskCachingRangeReader instance
@@ -586,7 +926,9 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
                     : Paths.get(System.getProperty("java.io.tmpdir"), "tileverse-rangereader-cache");
 
             long effectiveMaxCacheSize = maxCacheSizeBytes != null ? maxCacheSizeBytes : DEFAULT_MAX_CACHE_SIZE;
-            return new DiskCachingRangeReader(delegate, effectiveCacheDirectory, effectiveMaxCacheSize, deleteOnClose);
+            int effectiveBlockSize = blockSize != null ? blockSize : 0; // Default: no block alignment
+            return new DiskCachingRangeReader(
+                    delegate, effectiveCacheDirectory, effectiveMaxCacheSize, deleteOnClose, effectiveBlockSize);
         }
     }
 }

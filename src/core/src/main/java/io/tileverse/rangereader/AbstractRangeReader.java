@@ -17,6 +17,7 @@ package io.tileverse.rangereader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 
 /**
  * Abstract base class providing common implementation for {@link RangeReader}.
@@ -127,7 +128,25 @@ public abstract class AbstractRangeReader implements RangeReader {
 
         final int initialPosition = target.position();
 
+        final long nanoTimeStart = System.nanoTime();
+        final int remainingBefore = target.remaining();
+
         final int readCount = readRangeNoFlip(offset, actualLength, target);
+
+        long nanoTimeEnd = System.nanoTime();
+        long nanos = nanoTimeEnd - nanoTimeStart;
+
+        long millis = Duration.ofNanos(nanos).toMillis();
+        if (millis > 0)
+            System.out.printf(
+                    "[thread %02d] %s.readRange(offset: %d, length: %d, buffer[cap: %d, remaining: %d]), time: %d ms %n",
+                    Thread.currentThread().getId(),
+                    getClass().getSimpleName(),
+                    offset,
+                    length,
+                    target.capacity(),
+                    remainingBefore,
+                    millis);
 
         // Prepare the buffer for reading by flipping it within the read range
         int newPosition = target.position();

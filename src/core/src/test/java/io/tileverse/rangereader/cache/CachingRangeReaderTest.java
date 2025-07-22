@@ -300,6 +300,10 @@ public class CachingRangeReaderTest {
         // Test null time unit
         assertThrows(NullPointerException.class, () -> CachingRangeReader.builder(delegate)
                 .expireAfterAccess(1, null));
+
+        // Test invalid block size
+        assertThrows(IllegalArgumentException.class, () -> CachingRangeReader.builder(delegate)
+                .blockSize(-1));
     }
 
     @Test
@@ -392,6 +396,56 @@ public class CachingRangeReaderTest {
 
         // Delegate should be closed when CachingRangeReader is closed
         assertTrue(delegate.isClosed(), "Delegate should be closed");
+    }
+
+    @Test
+    void testHeaderBufferConfiguration() throws IOException {
+        // Test with header buffer enabled
+        try (RangeReader delegate = FileRangeReader.builder().path(testFile).build();
+                CachingRangeReader reader =
+                        CachingRangeReader.builder(delegate).withHeaderBuffer().build()) {
+
+            // Read from beginning of file - should come from header buffer
+            ByteBuffer data1 = reader.readRange(0, 1000);
+            assertEquals(1000, data1.remaining());
+
+            // Read again from header range - should still work from header buffer
+            ByteBuffer data2 = reader.readRange(500, 500);
+            assertEquals(500, data2.remaining());
+
+            // Cache should be empty since reads came from header buffer
+            assertEquals(0, reader.getCacheEntryCount(), "Cache should be empty with header buffer");
+        }
+
+        // Test with explicit header size
+        try (RangeReader delegate = FileRangeReader.builder().path(testFile).build();
+                CachingRangeReader reader = CachingRangeReader.builder(delegate)
+                        .headerSize(32 * 1024) // 32KB header
+                        .build()) {
+
+            // Read within header range
+            ByteBuffer headerData = reader.readRange(0, 1000);
+            assertEquals(1000, headerData.remaining());
+
+            // Read beyond header range - should use cache
+            ByteBuffer cachedData = reader.readRange(50000, 1000);
+            assertEquals(1000, cachedData.remaining());
+
+            // Cache should contain the beyond-header read
+            assertEquals(1, reader.getCacheEntryCount(), "Cache should contain beyond-header read");
+        }
+
+        // Test with header buffer disabled (default)
+        try (RangeReader delegate = FileRangeReader.builder().path(testFile).build();
+                CachingRangeReader reader = CachingRangeReader.builder(delegate).build()) {
+
+            // Read from beginning - should go to cache since no header buffer
+            ByteBuffer data = reader.readRange(0, 1000);
+            assertEquals(1000, data.remaining());
+
+            // Cache should contain the entry
+            assertEquals(1, reader.getCacheEntryCount(), "Cache should contain entry without header buffer");
+        }
     }
 
     /**

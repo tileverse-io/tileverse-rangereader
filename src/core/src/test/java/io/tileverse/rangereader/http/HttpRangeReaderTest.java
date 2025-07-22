@@ -87,7 +87,7 @@ class HttpRangeReaderTest {
                         .withHeader("Content-Length", String.valueOf(TEST_DATA.length))
                         .withHeader("Accept-Ranges", "bytes")));
 
-        // GET request for entire file
+        // GET request for entire file (without range header)
         wm.stubFor(get(urlEqualTo(TEST_PATH))
                 .willReturn(aResponse().withStatus(200).withBody(TEST_DATA)));
 
@@ -280,8 +280,9 @@ class HttpRangeReaderTest {
 
         URI noRangeUri = URI.create("http://localhost:" + TEST_PORT + "/no-range");
 
-        // Should throw during initialization
-        assertThrows(IOException.class, () -> new HttpRangeReader(noRangeUri));
+        // Should throw when readRange() is called (triggering range support initialization)
+        HttpRangeReader reader = new HttpRangeReader(noRangeUri);
+        assertThrows(IOException.class, () -> reader.readRange(0, 100));
     }
 
     @Test
@@ -306,25 +307,11 @@ class HttpRangeReaderTest {
                         .withHeader("Accept-Ranges", "bytes")));
 
         URI ignoreRangeUri = URI.create("http://localhost:" + TEST_PORT + "/ignore-range");
-        ByteBuffer buffer;
+
+        // Should throw IOException when server doesn't support range requests (returns 200 instead of 206)
         try (HttpRangeReader ignoreRangeReader = new HttpRangeReader(ignoreRangeUri)) {
-            // Request a small range
-            buffer = ignoreRangeReader.readRange(offset, length);
+            assertThrows(IOException.class, () -> ignoreRangeReader.readRange(offset, length));
         }
-        // We should still get the correct range back from the full response
-        assertEquals(length, buffer.remaining());
-
-        byte[] bytes = new byte[buffer.remaining()];
-        buffer.get(bytes);
-
-        // Verify bytes match expected pattern
-        for (int i = 0; i < length; i++) {
-            assertEquals((byte) ((offset + i) % 256), bytes[i], "Byte mismatch at index " + i);
-        }
-
-        // Verify the range request was made
-        wm.verify(getRequestedFor(urlEqualTo("/ignore-range"))
-                .withHeader("Range", equalTo("bytes=" + offset + "-" + end)));
     }
 
     @Test
@@ -334,7 +321,7 @@ class HttpRangeReaderTest {
         int length = 100;
         int end = offset + length - 1;
 
-        // Create a stub for a server that returns an error for range requests
+        // Create a stub for a server that returns an error for the actual range request
         wm.stubFor(get(urlEqualTo("/error"))
                 .withHeader("Range", equalTo("bytes=" + offset + "-" + end))
                 .willReturn(aResponse()
@@ -531,23 +518,25 @@ class HttpRangeReaderTest {
     }
 
     @Test
-    void testConnectionFailure() {
+    void testConnectionFailure() throws IOException {
         // Test behavior when connection fails
         URI nonExistentUri = URI.create("http://non-existent-host.example/test.pmtiles");
 
-        // Construction should throw IOException
-        assertThrows(IOException.class, () -> new HttpRangeReader(nonExistentUri));
+        // Should throw when size() is called (triggering initialization)
+        HttpRangeReader reader = new HttpRangeReader(nonExistentUri);
+        assertThrows(IOException.class, reader::size);
     }
 
     @Test
-    void testServerErrorOnHead() {
+    void testServerErrorOnHead() throws IOException {
         // Test behavior when server returns error on HEAD
         wm.stubFor(head(urlEqualTo("/server-error"))
                 .willReturn(aResponse().withStatus(500).withBody("Internal Server Error")));
 
         URI serverErrorUri = URI.create("http://localhost:" + TEST_PORT + "/server-error");
 
-        // Construction should throw IOException
-        assertThrows(IOException.class, () -> new HttpRangeReader(serverErrorUri));
+        // Should throw when size() is called (triggering initialization)
+        HttpRangeReader reader = new HttpRangeReader(serverErrorUri);
+        assertThrows(IOException.class, reader::size);
     }
 }
