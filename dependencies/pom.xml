@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.tileverse.rangereader</groupId>
+    <artifactId>tileverse-rangereader-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+  <artifactId>tileverse-rangereader-dependencies</artifactId>
+  <packaging>pom</packaging>
+  <name>Tileverse Range Reader Dependencies BOM</name>
+  <description>Manages versions of third-party libraries used by Tileverse RangeReader</description>
+
+  <properties>
+    <!-- Dependency versions -->
+    <aws-auth.version>2.31.70</aws-auth.version>
+    <aws-s3.version>2.31.70</aws-s3.version>
+    <azure-identity.version>1.15.4</azure-identity.version>
+    <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
+    <caffeine.version>3.2.1</caffeine.version>
+    <google-cloud-storage.version>2.53.1</google-cloud-storage.version>
+    <jackson.version>2.19.1</jackson.version>
+    <netty.version>4.1.122.Final</netty.version>
+    <slf4j-api.version>2.0.9</slf4j-api.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- overriding versions for dependency convergence -->
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-storage-bom</artifactId>
+        <version>${google-cloud-storage.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-bom</artifactId>
+        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.5.14</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-codec</groupId>
+        <artifactId>commons-codec</artifactId>
+        <version>1.18.0</version>
+      </dependency>
+
+      <!-- Logging -->
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j-api.version}</version>
+      </dependency>
+
+      <!-- Caching -->
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
+      </dependency>
+
+      <!-- Cloud Storage -->
+      <!-- Azure -->
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-storage-blob</artifactId>
+        <version>${azure-storage-blob.version}</version>
+        <optional>true</optional>
+      </dependency>
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-identity</artifactId>
+        <version>${azure-identity.version}</version>
+        <optional>true</optional>
+      </dependency>
+      <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>msal4j</artifactId>
+        <version>1.19.1</version>
+      </dependency>
+
+      <!-- AWS -->
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>s3</artifactId>
+        <version>${aws-s3.version}</version>
+        <optional>true</optional>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>auth</artifactId>
+        <version>${aws-auth.version}</version>
+        <optional>true</optional>
+      </dependency>
+      <!-- S3 specific authentication methods -->
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>sts</artifactId>
+        <version>${aws-auth.version}</version>
+        <optional>true</optional>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>sso</artifactId>
+        <version>${aws-auth.version}</version>
+        <optional>true</optional>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  <build>
+    <plugins>
+      <plugin>
+        <!--
+        flatten plugin configured to install a BOM pom, though not using flattenMode=bom because it doesn't resolve
+        version properties and adds properties defined in the root pom.
+        See https://www.mojohaus.org/flatten-maven-plugin/flatten-mojo.html#flattenMode
+        -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>flatten-maven-plugin</artifactId>
+        <configuration>
+          <updatePomFile>true</updatePomFile>
+          <flattenMode>ossrh</flattenMode>
+          <pomElements>
+            <!--
+            Take the element from the interpolated POM (original POM with variables interpolated).
+            This avoids adding dependencies defined in the root pom (e.g. junit) 
+            -->
+            <dependencyManagement>interpolate</dependencyManagement>
+          </pomElements>
+        </configuration>
+        <executions>
+          <execution>
+            <id>flatten</id>
+            <goals>
+              <goal>flatten</goal>
+            </goals>
+            <phase>process-resources</phase>
+          </execution>
+          <execution>
+            <id>flatten.clean</id>
+            <goals>
+              <goal>clean</goal>
+            </goals>
+            <phase>clean</phase>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

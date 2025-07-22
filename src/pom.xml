@@ -4,7 +4,7 @@
 
   <parent>
     <groupId>io.tileverse.rangereader</groupId>
-    <artifactId>tileverse-rangereader</artifactId>
+    <artifactId>tileverse-rangereader-parent</artifactId>
     <version>${revision}</version>
   </parent>
 
@@ -18,7 +18,50 @@
     <module>all</module>
   </modules>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-dependencies</artifactId>
+        <version>${project.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-bom</artifactId>
+        <version>${project.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
+    <!--
+     Adding dependencies and bom as dependencies with type=pom and scope=provided here
+     does not change the dependency tree for the submodules at all, but forces the BOMs to be installed
+     in the local maven repository first, either when building the whole project or when a submodule is
+     built independently (e.g. mvn install -pl :<module> -am), hence ensuring any change to the dependencies
+     is picked up.
+    -->
+    <dependency>
+      <groupId>io.tileverse.rangereader</groupId>
+      <artifactId>tileverse-rangereader-dependencies</artifactId>
+      <version>${project.version}</version>
+      <type>pom</type>
+      <scope>provided</scope>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>io.tileverse.rangereader</groupId>
+      <artifactId>tileverse-rangereader-bom</artifactId>
+      <version>${project.version}</version>
+      <type>pom</type>
+      <scope>provided</scope>
+      <optional>true</optional>
+    </dependency>
+
     <!-- Common dependencies for all modules -->
     <dependency>
       <groupId>org.slf4j</groupId>

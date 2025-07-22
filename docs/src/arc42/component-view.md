@@ -4,6 +4,36 @@
 
 The component view provides detailed insight into the internal structure of the main modules, showing how the decorator pattern and builder pattern are implemented to provide flexible, composable functionality.
 
+## Project Structure
+
+The project follows a multi-module Maven structure with comprehensive dependency management through Bills of Materials (BOMs):
+
+```
+tileverse-rangereader-parent/
+├── dependencies/          # BOM managing third-party dependency versions
+├── bom/                  # BOM managing Range Reader module versions  
+├── src/core/             # Core interfaces and implementations
+├── src/s3/               # AWS S3 implementation
+├── src/azure/            # Azure Blob Storage implementation
+├── src/gcs/              # Google Cloud Storage implementation
+├── src/all/              # Unified builder and factory (legacy)
+└── benchmarks/           # JMH performance benchmarks
+```
+
+### BOM Architecture
+
+The project provides a two-tier BOM structure for optimal dependency management:
+
+#### Dependencies BOM (`tileverse-rangereader-dependencies`)
+- Manages versions of third-party libraries (AWS SDK, Azure SDK, etc.)
+- Ensures dependency convergence across all modules
+- Provides a single source of truth for external dependency versions
+
+#### Range Reader BOM (`tileverse-rangereader-bom`)  
+- Manages versions of all Range Reader modules
+- Simplifies consumption by downstream projects
+- Enables version-consistent module combinations
+
 ## Core Module Components
 
 ![Core Module Components](../assets/images/structurizr/structurizr-CoreComponents.svg)
