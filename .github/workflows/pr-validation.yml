@@ -61,7 +61,7 @@ jobs:
         cache: maven
         
     - name: Compile code
-      run: make compile
+      run: make install
       
     - name: Run unit tests
       run: make test-unit
