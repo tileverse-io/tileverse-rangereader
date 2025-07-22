@@ -18,8 +18,11 @@
     <azure-identity.version>1.15.4</azure-identity.version>
     <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
     <caffeine.version>3.2.1</caffeine.version>
+    <commons-codec.version>1.18.0</commons-codec.version>
     <google-cloud-storage.version>2.53.1</google-cloud-storage.version>
-    <jackson.version>2.19.1</jackson.version>
+    <httpclient.version>4.5.14</httpclient.version>
+    <jackson.version>2.19.2</jackson.version>
+    <msal4j.version>1.19.1</msal4j.version>
     <netty.version>4.1.122.Final</netty.version>
     <slf4j-api.version>2.0.9</slf4j-api.version>
   </properties>
@@ -28,6 +31,16 @@
     <dependencies>
       <!-- overriding versions for dependency convergence -->
       <dependency>
+        <!--
+        dependency convergence between transitive dependencies of
+        com.azure:azure-storage-blob:jar:12.30.0:compile
+         +-com.azure:azure-core:jar:1.55.3:compile
+           +-com.fasterxml.jackson.core:jackson-databind:jar:2.17.2:compile
+             +-com.fasterxml.jackson.core:jackson-core:jar:2.17.2:compile
+        and
+        com.google.cloud:google-cloud-storage:jar:2.53.1:compile
+         +-com.fasterxml.jackson.core:jackson-core:jar:2.18.2:compile
+        -->
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
@@ -35,13 +48,20 @@
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-storage-bom</artifactId>
-        <version>${google-cloud-storage.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
+        <!--
+        dependency convergence between transitive dependencies of
+        +-io.tileverse.rangereader:tileverse-rangereader-azure:jar:1.0-SNAPSHOT
+          +-com.azure:azure-storage-blob:jar:12.30.0:compile
+            +-com.azure:azure-core-http-netty:jar:1.15.11:compile
+              +-io.netty:netty-codec-http2:jar:4.1.118.Final:compile
+        and
+        +-io.tileverse.rangereader:tileverse-rangereader-azure:jar:1.0-SNAPSHOT
+          +-com.azure:azure-storage-blob:jar:12.30.0:compile
+            +-com.azure:azure-core-http-netty:jar:1.15.11:compile
+              +-io.projectreactor.netty:reactor-netty-http:jar:1.0.48:compile
+                +-io.netty:netty-codec-http2:jar:4.1.112.Final:compile
+        and several more
+        -->
         <groupId>io.netty</groupId>
         <artifactId>netty-bom</artifactId>
         <version>${netty.version}</version>
@@ -49,14 +69,40 @@
         <scope>import</scope>
       </dependency>
       <dependency>
+        <!--
+        dependency convergence between transitive dependencies of
+        +-io.tileverse.rangereader:tileverse-rangereader-s3:jar:1.0-SNAPSHOT
+          +-software.amazon.awssdk:s3:jar:2.31.70:compile
+            +-software.amazon.awssdk:apache-client:jar:2.31.70:runtime
+              +-org.apache.httpcomponents:httpclient:jar:4.5.13:runtime
+                +-org.apache.httpcomponents:httpcore:jar:4.4.13:runtime
+        and
+        +-io.tileverse.rangereader:tileverse-rangereader-s3:jar:1.0-SNAPSHOT
+          +-software.amazon.awssdk:s3:jar:2.31.70:compile
+            +-software.amazon.awssdk:apache-client:jar:2.31.70:runtime
+              +-org.apache.httpcomponents:httpcore:jar:4.4.16:runtime
+        -->
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
+        <version>${httpclient.version}</version>
       </dependency>
       <dependency>
+        <!--
+        dependency convergence between transitive dependencies of
+         +-io.tileverse.rangereader:tileverse-rangereader-s3:jar:1.0-SNAPSHOT
+           +-software.amazon.awssdk:s3:jar:2.31.70:compile
+             +-software.amazon.awssdk:apache-client:jar:2.31.70:runtime
+               +-org.apache.httpcomponents:httpclient:jar:4.5.14:runtime
+                +-commons-codec:commons-codec:jar:1.11:runtime
+         and
+         +-io.tileverse.rangereader:tileverse-rangereader-s3:jar:1.0-SNAPSHOT
+           +-software.amazon.awssdk:s3:jar:2.31.70:compile
+             +-software.amazon.awssdk:apache-client:jar:2.31.70:runtime
+               +-commons-codec:commons-codec:jar:1.17.1:runtime
+        -->
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
-        <version>1.18.0</version>
+        <version>${commons-codec.version}</version>
       </dependency>
 
       <!-- Logging -->
@@ -73,7 +119,15 @@
         <version>${caffeine.version}</version>
       </dependency>
 
-      <!-- Cloud Storage -->
+      <!-- Google Cloud Storage -->
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-storage-bom</artifactId>
+        <version>${google-cloud-storage.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
       <!-- Azure -->
       <dependency>
         <groupId>com.azure</groupId>
@@ -90,7 +144,7 @@
       <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>msal4j</artifactId>
-        <version>1.19.1</version>
+        <version>${msal4j.version}</version>
       </dependency>
 
       <!-- AWS -->
