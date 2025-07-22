@@ -17,6 +17,7 @@ package io.tileverse.rangereader.block;
 
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.nio.ByteBufferPool;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
@@ -98,54 +99,58 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
         }
 
         // Keep a small working buffer to read blocks
-        final ByteBuffer blockBuffer = ByteBuffer.allocate(blockSize);
+        final ByteBufferPool pool = ByteBufferPool.getDefault();
+        final ByteBuffer blockBuffer = pool.borrowDirect(blockSize);
+        try {
+            // Position tracking for partial blocks
+            int bytesRemaining = actualLength;
 
-        // Position tracking for partial blocks
-        int bytesRemaining = actualLength;
+            // Read each block individually
+            for (int i = 0; i < numBlocks && bytesRemaining > 0; i++) {
+                // Calculate the block offset for this iteration
+                long blockOffset = alignedOffset + (i * blockSize);
 
-        // Read each block individually
-        for (int i = 0; i < numBlocks && bytesRemaining > 0; i++) {
-            // Calculate the block offset for this iteration
-            long blockOffset = alignedOffset + (i * blockSize);
+                // Calculate how much data in this block is relevant to our request
+                long blockEndOffset = blockOffset + blockSize;
+                long readStartOffset = Math.max(blockOffset, offset);
+                long readEndOffset = Math.min(blockEndOffset, endOffset);
+                int blockReadSize = (int) (readEndOffset - readStartOffset);
 
-            // Calculate how much data in this block is relevant to our request
-            long blockEndOffset = blockOffset + blockSize;
-            long readStartOffset = Math.max(blockOffset, offset);
-            long readEndOffset = Math.min(blockEndOffset, endOffset);
-            int blockReadSize = (int) (readEndOffset - readStartOffset);
+                if (blockReadSize <= 0) {
+                    continue; // Skip this block if it doesn't contain data we need
+                }
 
-            if (blockReadSize <= 0) {
-                continue; // Skip this block if it doesn't contain data we need
+                // Read the block from the delegate
+                blockBuffer.clear();
+                this.readRange(blockOffset, blockSize, blockBuffer);
+
+                // Calculate position within the block for our data
+                int blockPosition = (int) (readStartOffset - blockOffset);
+
+                // Position and limit the buffer to only get the data we want
+                if (blockBuffer.remaining() <= blockPosition) {
+                    // We've reached the end of the data
+                    break;
+                }
+
+                blockBuffer.position(blockBuffer.position() + blockPosition);
+                int availableInBlock = blockBuffer.remaining();
+                int toCopy = Math.min(blockReadSize, availableInBlock);
+                blockBuffer.limit(blockBuffer.position() + toCopy);
+
+                // Copy this block's contribution to the target
+                target.put(blockBuffer);
+
+                // Update tracking
+                bytesRemaining -= toCopy;
             }
 
-            // Read the block from the delegate
-            blockBuffer.clear();
-            this.readRange(blockOffset, blockSize, blockBuffer);
-
-            // Calculate position within the block for our data
-            int blockPosition = (int) (readStartOffset - blockOffset);
-
-            // Position and limit the buffer to only get the data we want
-            if (blockBuffer.remaining() <= blockPosition) {
-                // We've reached the end of the data
-                break;
-            }
-
-            blockBuffer.position(blockBuffer.position() + blockPosition);
-            int availableInBlock = blockBuffer.remaining();
-            int toCopy = Math.min(blockReadSize, availableInBlock);
-            blockBuffer.limit(blockBuffer.position() + toCopy);
-
-            // Copy this block's contribution to the target
-            target.put(blockBuffer);
-
-            // Update tracking
-            bytesRemaining -= toCopy;
+            // Calculate how many bytes were actually read
+            int bytesRead = actualLength - bytesRemaining;
+            return bytesRead;
+        } finally {
+            pool.returnBuffer(blockBuffer);
         }
-
-        // Calculate how many bytes were actually read
-        int bytesRead = actualLength - bytesRemaining;
-        return bytesRead;
     }
 
     @Override

@@ -30,6 +30,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
@@ -58,7 +59,10 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     private final URI uri;
     private final HttpClient httpClient;
     private final HttpAuthentication authentication;
-    private long contentLength = -1;
+    private volatile long contentLength = -1;
+    private volatile boolean sizeInitialized = false;
+    private volatile boolean rangeInitialized = false;
+    private volatile HttpResponse<Void> cachedHeadResponse = null;
 
     /**
      * Creates a new HttpRangeReader for the specified URI with default settings.
@@ -186,52 +190,87 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         this.httpClient = httpClient;
         this.authentication = authentication; // Can be null for no authentication
 
-        // Verify that the URI is accessible and check for range support
+        // Content length and range support will be checked when size() is first called
+    }
+
+    @Override
+    protected int readRangeNoFlip(final long offset, final int actualLength, ByteBuffer target) throws IOException {
+        checkServerSupportsByteRanges();
+
+        // Track initial position to calculate bytes read
+        int initialPosition = target.position();
+
         try {
-            HttpRequest.Builder requestBuilder =
-                    HttpRequest.newBuilder().uri(uri).method("HEAD", HttpRequest.BodyPublishers.noBody());
+            HttpResponse<Void> response = sendRangeRequest(offset, actualLength, target);
 
-            // Apply authentication if provided
-            if (authentication != null) {
-                requestBuilder = authentication.authenticate(httpClient, requestBuilder);
+            checkStatusCode(response);
+
+            // Calculate actual bytes read by comparing positions
+            return target.position() - initialPosition;
+
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Response body larger than expected")) {
+                throw new IOException("Server returned more data than requested range length", e);
             }
-
-            HttpRequest headRequest = requestBuilder.build();
-            HttpResponse<Void> headResponse = httpClient.send(headRequest, HttpResponse.BodyHandlers.discarding());
-
-            int statusCode = headResponse.statusCode();
-            if (statusCode == 401 || statusCode == 403) {
-                throw new IOException("Authentication failed for URI: " + uri + ", status code: " + statusCode);
-            } else if (statusCode != 200) {
-                throw new IOException("Failed to connect to URI: " + uri + ", status code: " + statusCode);
-            }
-
-            // Check for range support (optional, we'll still try if not advertised)
-            Optional<String> acceptRanges = headResponse.headers().firstValue("Accept-Ranges");
-            if (acceptRanges.isPresent() && acceptRanges.get().equals("none")) {
-                // Server explicitly doesn't support ranges
-                throw new IOException("Server does not support range requests");
-            }
-
-            // Get content length
-            Optional<String> contentLengthHeader = headResponse.headers().firstValue("Content-Length");
-            if (contentLengthHeader.isPresent()) {
-                try {
-                    this.contentLength = Long.parseLong(contentLengthHeader.get());
-                } catch (NumberFormatException e) {
-                    // Ignore, we'll fetch it later if needed
-                }
-            }
-
+            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Request was interrupted", e);
         }
     }
 
-    @Override
-    protected int readRangeNoFlip(final long offset, final int actualLength, ByteBuffer target) throws IOException {
+    private HttpResponse<Void> sendRangeRequest(final long offset, final int actualLength, ByteBuffer targetBuffer)
+            throws IOException, InterruptedException {
 
+        final HttpRequest request = buildRangeRequest(offset, actualLength);
+
+        Consumer<Optional<byte[]>> bodyConsumer = createStreamingConsumer(targetBuffer, actualLength);
+        HttpResponse<Void> response =
+                httpClient.send(request, HttpResponse.BodyHandlers.ofByteArrayConsumer(bodyConsumer));
+        return response;
+    }
+
+    /**
+     * Creates a consumer for streaming HTTP response data into a ByteBuffer.
+     * The consumer handles multiple calls as data chunks arrive from the network.
+     * <p>
+     * Since the Javadocs for {@code HttpResponse.BodyHandlers.ofByteArrayConsumer()} are not very clear:
+     * <ul>
+     * <li>The consumer can be called multiple times as data chunks arrive from the network
+     * <li>Each call receives an Optional<byte[]> containing a chunk of the response data
+     * <li>An empty Optional indicates the end of the stream
+     * </ul>
+     * @param targetBuffer the buffer to write response data into
+     * @param expectedLength the expected total length of the response
+     * @return a consumer that processes streaming response chunks
+     */
+    private Consumer<Optional<byte[]>> createStreamingConsumer(ByteBuffer targetBuffer, int expectedLength) {
+        return optionalBytes -> {
+            if (optionalBytes.isPresent()) {
+                byte[] chunk = optionalBytes.get();
+                if (targetBuffer.remaining() >= chunk.length) {
+                    targetBuffer.put(chunk);
+                } else {
+                    // Buffer overflow - response is larger than expected
+                    throw new RuntimeException("Response body larger than expected range length. Expected: "
+                            + expectedLength + ", received chunk size: "
+                            + chunk.length + ", remaining buffer space: "
+                            + targetBuffer.remaining());
+                }
+            }
+        };
+    }
+
+    private void checkStatusCode(HttpResponse<Void> response) throws IOException {
+        int statusCode = response.statusCode();
+        if (statusCode == 401 || statusCode == 403) {
+            throw new IOException("Authentication failed for URI: " + uri + ", status code: " + statusCode);
+        } else if (statusCode != 206) {
+            throw new IOException("Failed to get range from URI: " + uri + ", status code: " + statusCode);
+        }
+    }
+
+    private HttpRequest buildRangeRequest(final long offset, final int actualLength) {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Range", "bytes=" + offset + "-" + (offset + actualLength - 1))
@@ -242,81 +281,115 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
             requestBuilder = authentication.authenticate(httpClient, requestBuilder);
         }
 
-        HttpRequest request = requestBuilder.build();
+        return requestBuilder.build();
+    }
 
-        try {
-            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-
-            int statusCode = response.statusCode();
-            if (statusCode == 401 || statusCode == 403) {
-                throw new IOException("Authentication failed for URI: " + uri + ", status code: " + statusCode);
-            } else if (statusCode != 206 && statusCode != 200) {
-                throw new IOException("Failed to get range from URI: " + uri + ", status code: " + statusCode);
+    private void checkServerSupportsByteRanges() throws IOException {
+        // Initialize range support on first read
+        if (!rangeInitialized) {
+            synchronized (this) {
+                if (!rangeInitialized) {
+                    initializeRangeSupport();
+                    rangeInitialized = true;
+                }
             }
-
-            byte[] responseBody = response.body();
-            int bytesRead;
-
-            // Handle case where server ignores range request and sends entire file
-            if (statusCode == 200 && responseBody.length > actualLength) {
-                // Extract just the range we requested and put into target buffer
-                target.put(responseBody, (int) offset, actualLength);
-                bytesRead = actualLength;
-            } else {
-                // Put the response directly into the target buffer
-                target.put(responseBody);
-                bytesRead = responseBody.length;
-            }
-
-            return bytesRead;
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Request was interrupted", e);
         }
     }
 
     @Override
     public long size() throws IOException {
-        if (contentLength < 0) {
-            // Fetch content length if we don't have it
-            try {
-                HttpRequest.Builder requestBuilder =
-                        HttpRequest.newBuilder().uri(uri).method("HEAD", HttpRequest.BodyPublishers.noBody());
-
-                // Apply authentication if provided
-                if (authentication != null) {
-                    requestBuilder = authentication.authenticate(httpClient, requestBuilder);
+        if (!sizeInitialized) {
+            synchronized (this) {
+                if (!sizeInitialized) {
+                    initializeSize();
+                    sizeInitialized = true;
                 }
-
-                HttpRequest headRequest = requestBuilder.build();
-                HttpResponse<Void> headResponse = httpClient.send(headRequest, HttpResponse.BodyHandlers.discarding());
-
-                int statusCode = headResponse.statusCode();
-                if (statusCode == 401 || statusCode == 403) {
-                    throw new IOException("Authentication failed for URI: " + uri + ", status code: " + statusCode);
-                } else if (statusCode != 200) {
-                    throw new IOException("Failed to get content length from URI: " + uri);
-                }
-
-                Optional<String> contentLengthHeader = headResponse.headers().firstValue("Content-Length");
-                if (contentLengthHeader.isPresent()) {
-                    try {
-                        contentLength = Long.parseLong(contentLengthHeader.get());
-                    } catch (NumberFormatException e) {
-                        throw new IOException("Invalid content length header: " + contentLengthHeader.get());
-                    }
-                } else {
-                    throw new IOException("Content length header missing");
-                }
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Request was interrupted", e);
             }
         }
-
         return contentLength;
+    }
+
+    /**
+     * Makes a HEAD request to the server and caches the response for reuse.
+     * This method is thread-safe and ensures the HEAD request is made only once.
+     *
+     * @return the cached HEAD response
+     * @throws IOException If an I/O error occurs during the HEAD request
+     */
+    private HttpResponse<Void> getHeadResponse() throws IOException {
+        if (cachedHeadResponse == null) {
+            synchronized (this) {
+                if (cachedHeadResponse == null) {
+                    try {
+                        HttpRequest.Builder requestBuilder =
+                                HttpRequest.newBuilder().uri(uri).method("HEAD", HttpRequest.BodyPublishers.noBody());
+
+                        // Apply authentication if provided
+                        if (authentication != null) {
+                            requestBuilder = authentication.authenticate(httpClient, requestBuilder);
+                        }
+
+                        HttpRequest headRequest = requestBuilder.build();
+                        HttpResponse<Void> headResponse =
+                                httpClient.send(headRequest, HttpResponse.BodyHandlers.discarding());
+
+                        int statusCode = headResponse.statusCode();
+                        if (statusCode == 401 || statusCode == 403) {
+                            throw new IOException(
+                                    "Authentication failed for URI: " + uri + ", status code: " + statusCode);
+                        } else if (statusCode != 200) {
+                            throw new IOException("Failed to connect to URI: " + uri + ", status code: " + statusCode);
+                        }
+
+                        cachedHeadResponse = headResponse;
+
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Request was interrupted", e);
+                    }
+                }
+            }
+        }
+        return cachedHeadResponse;
+    }
+
+    /**
+     * Initializes the content length from the cached HEAD response.
+     *
+     * @throws IOException If an I/O error occurs or the content length is invalid
+     */
+    private void initializeSize() throws IOException {
+        HttpResponse<Void> headResponse = getHeadResponse();
+
+        // Get content length
+        Optional<String> contentLengthHeader = headResponse.headers().firstValue("Content-Length");
+        if (contentLengthHeader.isPresent()) {
+            try {
+                this.contentLength = Long.parseLong(contentLengthHeader.get());
+            } catch (NumberFormatException e) {
+                throw new IOException("Invalid content length header: " + contentLengthHeader.get());
+            }
+        } else {
+            throw new IOException("Content length header missing");
+        }
+    }
+
+    /**
+     * Initializes range support by checking the Accept-Ranges header from the cached HEAD response.
+     *
+     * @throws IOException If the server doesn't support range requests
+     */
+    private void initializeRangeSupport() throws IOException {
+        HttpResponse<Void> headResponse = getHeadResponse();
+
+        // Check for explicit range support denial
+        Optional<String> acceptRanges = headResponse.headers().firstValue("Accept-Ranges");
+        if (acceptRanges.isPresent() && acceptRanges.get().equals("none")) {
+            throw new IOException("Server explicitly does not support range requests (Accept-Ranges: none)");
+        }
+
+        // If Accept-Ranges: bytes is present, range requests are supported
+        // If Accept-Ranges header is absent, we'll assume range support and let readRangeNoFlip() handle any errors
     }
 
     @Override

@@ -70,8 +70,11 @@ class RangeReaderFactoryTest {
         // This will attempt to connect to a real URL, so we expect an IOException
         URI httpUri = URI.create("http://example.com/test.pmtiles");
 
-        // We expect this to throw because it's not a real PMTiles file
-        assertThrows(IOException.class, () -> RangeReaderFactory.create(httpUri));
+        // Factory should succeed in creating the reader (lazy initialization)
+        RangeReader reader = RangeReaderFactory.create(httpUri);
+
+        // But calling size() should throw because it's not a real PMTiles file
+        assertThrows(IOException.class, reader::size);
     }
 
     @Test
