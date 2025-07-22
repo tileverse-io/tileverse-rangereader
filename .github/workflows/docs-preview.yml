@@ -69,10 +69,14 @@ jobs:
         fi
         
         # Insert banner config after the 'extra:' line
-        sed -i "/^extra:/a\\
-  banner:\\
-    enabled: true\\
-    message: \"$BANNER_MESSAGE\"" mkdocs-preview.yml
+        cat >> mkdocs-preview.yml << EOF
+        
+        # Preview banner configuration
+        extra:
+          banner:
+            enabled: true
+            message: "$BANNER_MESSAGE"
+        EOF
         
         # Build with activated virtual environment
         mkdocs build --config-file mkdocs-preview.yml --strict
