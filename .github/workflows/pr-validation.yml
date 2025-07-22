@@ -75,6 +75,10 @@ jobs:
           **/target/surefire-reports/
           **/target/site/jacoco/
 
+    - name: Remove SNAPSHOT jars from repository
+      run: |
+        find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {}
+
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
@@ -111,6 +115,10 @@ jobs:
         path: |
           **/target/failsafe-reports/
           **/target/logs/
+
+    - name: Remove SNAPSHOT jars from repository
+      run: |
+        find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {}
 
   # Summary job that depends on all others
   pr-validation-complete:
