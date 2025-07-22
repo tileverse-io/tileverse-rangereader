@@ -9,7 +9,38 @@ This guide explains how to add the Tileverse Range Reader library to your Java p
 
 ## Maven Installation
 
-### All Modules (Recommended)
+### Using the BOM (Recommended)
+
+The project provides a Bill of Materials (BOM) to manage dependency versions:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.tileverse.rangereader</groupId>
+            <artifactId>tileverse-rangereader-bom</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <!-- Now you can omit versions - they're managed by the BOM -->
+    <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-core</artifactId>
+    </dependency>
+    <!-- Add cloud provider modules as needed -->
+    <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-s3</artifactId>
+    </dependency>
+</dependencies>
+```
+
+### All Modules (Simple Approach)
 
 Include all functionality with a single dependency:
 
@@ -21,9 +52,9 @@ Include all functionality with a single dependency:
 </dependency>
 ```
 
-### Individual Modules
+### Individual Modules (Without BOM)
 
-For smaller dependencies, include only the modules you need:
+If you prefer not to use the BOM, specify versions explicitly:
 
 #### Core Module (Required)
 
@@ -67,7 +98,72 @@ For smaller dependencies, include only the modules you need:
     </dependency>
     ```
 
+### Dependency Management BOMs
+
+The project provides two BOMs for different use cases:
+
+#### Tileverse Range Reader BOM
+
+Manages versions of all Tileverse Range Reader modules:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.tileverse.rangereader</groupId>
+            <artifactId>tileverse-rangereader-bom</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+#### Dependencies BOM
+
+Manages versions of third-party dependencies (for library developers):
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.tileverse.rangereader</groupId>
+            <artifactId>tileverse-rangereader-dependencies</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+This BOM includes managed versions for:
+
+- AWS SDK components
+- Azure Storage SDK components  
+- Google Cloud Storage SDK components
+- Jackson (JSON processing)
+- Caffeine (caching)
+- Netty (networking)
+
 ## Gradle Installation
+
+### Using the BOM (Recommended)
+
+```gradle
+dependencyManagement {
+    imports {
+        mavenBom 'io.tileverse.rangereader:tileverse-rangereader-bom:1.0-SNAPSHOT'
+    }
+}
+
+dependencies {
+    // Versions managed by the BOM
+    implementation 'io.tileverse.rangereader:tileverse-rangereader-core'
+    implementation 'io.tileverse.rangereader:tileverse-rangereader-s3'
+}
+```
 
 ### All Modules
 

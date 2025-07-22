@@ -2,6 +2,75 @@
 
 Optimize the Tileverse Range Reader for your specific use case with proper configuration.
 
+## Dependency Management
+
+### Using BOMs (Recommended)
+
+The Tileverse Range Reader provides Bills of Materials (BOMs) to simplify dependency management:
+
+#### Range Reader BOM
+
+Use this BOM in your application to manage Range Reader module versions:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.tileverse.rangereader</groupId>
+            <artifactId>tileverse-rangereader-bom</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <!-- Versions managed by the BOM -->
+    <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-core</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.tileverse.rangereader</groupId>
+        <artifactId>tileverse-rangereader-s3</artifactId>
+    </dependency>
+</dependencies>
+```
+
+#### Dependencies BOM (For Library Developers)
+
+If you're developing libraries that extend Range Reader or need specific third-party dependency versions:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <!-- Import Range Reader dependencies BOM first -->
+        <dependency>
+            <groupId>io.tileverse.rangereader</groupId>
+            <artifactId>tileverse-rangereader-dependencies</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+        <!-- Then import Range Reader modules BOM -->
+        <dependency>
+            <groupId>io.tileverse.rangereader</groupId>
+            <artifactId>tileverse-rangereader-bom</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+This approach ensures:
+- Consistent dependency versions across all modules
+- Reduced version conflicts and dependency hell
+- Simplified dependency declaration (no version numbers needed)
+- Easier upgrades (change only the BOM version)
+
 ## Performance Configuration
 
 ### Caching Strategies

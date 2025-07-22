@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.tileverse.rangereader</groupId>
-  <artifactId>tileverse-rangereader</artifactId>
+  <artifactId>tileverse-rangereader-parent</artifactId>
   <version>${revision}</version>
   <packaging>pom</packaging>
   <name>Tileverse Range Reader</name>
@@ -11,6 +11,8 @@
   <url>https://tileverse.io</url>
 
   <modules>
+    <module>dependencies</module>
+    <module>bom</module>
     <module>src</module>
     <module>benchmarks</module>
   </modules>
@@ -43,16 +45,8 @@
     <spotless.action>apply</spotless.action>
 
     <!-- Dependency versions -->
-    <aws-auth.version>2.31.70</aws-auth.version>
-    <aws-s3.version>2.31.70</aws-s3.version>
-    <azure-identity.version>1.15.4</azure-identity.version>
-    <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
-    <caffeine.version>3.2.1</caffeine.version>
-    <google-cloud-storage.version>2.53.1</google-cloud-storage.version>
-    <jackson.version>2.19.1</jackson.version>
-    <netty.version>4.1.122.Final</netty.version>
-    <protobuf.version>4.31.1</protobuf.version>
-    <slf4j.version>2.0.9</slf4j.version>
+    <!-- Runtime dependencies are defined in the dependencies/pom.xml BOM -->
+    <lombok.version>1.18.38</lombok.version>
 
     <!-- Test Dependency versions -->
     <assertj.version>3.27.3</assertj.version>
@@ -67,139 +61,25 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- overriding versions for dependency convergence -->
-      <dependency>
-        <groupId>com.fasterxml.jackson</groupId>
-        <artifactId>jackson-bom</artifactId>
-        <version>${jackson.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-storage-bom</artifactId>
-        <version>${google-cloud-storage.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-bom</artifactId>
-        <version>${netty.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-codec</groupId>
-        <artifactId>commons-codec</artifactId>
-        <version>1.18.0</version>
-      </dependency>
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.38</version>
-      </dependency>
-
-      <!-- Caching -->
-      <dependency>
-        <groupId>com.github.ben-manes.caffeine</groupId>
-        <artifactId>caffeine</artifactId>
-        <version>${caffeine.version}</version>
-      </dependency>
-
-      <!-- Cloud Storage -->
-      <!-- Azure -->
-      <dependency>
-        <groupId>com.azure</groupId>
-        <artifactId>azure-storage-blob</artifactId>
-        <version>${azure-storage-blob.version}</version>
-        <optional>true</optional>
-      </dependency>
-      <dependency>
-        <groupId>com.azure</groupId>
-        <artifactId>azure-identity</artifactId>
-        <version>${azure-identity.version}</version>
-        <optional>true</optional>
-      </dependency>
-      <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>msal4j</artifactId>
-        <version>1.19.1</version>
-      </dependency>
-
-      <!-- AWS -->
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>s3</artifactId>
-        <version>${aws-s3.version}</version>
-        <optional>true</optional>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>auth</artifactId>
-        <version>${aws-auth.version}</version>
-        <optional>true</optional>
-      </dependency>
-      <!-- S3 specific authentication methods -->
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>sts</artifactId>
-        <version>${aws-auth.version}</version>
-        <optional>true</optional>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>sso</artifactId>
-        <version>${aws-auth.version}</version>
+        <version>${lombok.version}</version>
+        <scope>provided</scope>
         <optional>true</optional>
       </dependency>
 
-      <!-- Logging -->
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
+      <!-- Testing -->
       <dependency>
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
         <version>${logback.version}</version>
       </dependency>
-
-      <!-- Internal modules -->
       <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-core</artifactId>
-        <version>${project.version}</version>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>${commons-io.version}</version>
       </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-azure</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-gcs</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-s3</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.tileverse.rangereader</groupId>
-        <artifactId>tileverse-rangereader-all</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-
-      <!-- Testing -->
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
@@ -243,11 +123,6 @@
         <artifactId>awaitility</artifactId>
         <version>${awaitility.version}</version>
         <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>${commons-io.version}</version>
       </dependency>
       <dependency>
         <groupId>org.openjdk.jmh</groupId>

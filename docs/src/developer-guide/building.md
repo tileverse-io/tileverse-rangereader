@@ -293,6 +293,37 @@ java -jar benchmarks/target/benchmarks.jar
 
 ## Module Structure
 
+The project follows a multi-module Maven structure with BOMs for dependency management:
+
+### BOM Modules
+
+#### Dependencies BOM (`dependencies/`)
+
+```bash
+# Build dependencies BOM
+./mvnw clean compile -pl dependencies
+
+# This module manages third-party dependency versions:
+# - AWS SDK components
+# - Azure Storage SDK components
+# - Google Cloud Storage SDK components
+# - Jackson, Caffeine, Netty, etc.
+```
+
+#### Range Reader BOM (`bom/`)
+
+```bash
+# Build Range Reader BOM
+./mvnw clean compile -pl bom
+
+# This module manages Range Reader module versions:
+# - tileverse-rangereader-core
+# - tileverse-rangereader-s3
+# - tileverse-rangereader-azure
+# - tileverse-rangereader-gcs
+# - tileverse-rangereader-all
+```
+
 ### Core Module (`src/core`)
 
 ```bash
@@ -345,6 +376,21 @@ src/core/
 ./mvnw clean compile -pl benchmarks -am
 
 # Requires all other modules
+```
+
+### Complete Module Build Order
+
+The modules have the following dependency hierarchy:
+
+```
+dependencies (BOM for third-party deps)
+├── bom (BOM for Range Reader modules)  
+├── src/core (core interfaces and implementations)
+├── src/s3 (depends on core)
+├── src/azure (depends on core)  
+├── src/gcs (depends on core)
+├── src/all (depends on all cloud provider modules)
+└── benchmarks (depends on all modules)
 ```
 
 ## CI-Friendly Versioning
