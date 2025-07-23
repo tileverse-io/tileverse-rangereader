@@ -24,6 +24,9 @@ import java.io.Serializable;
  * @param length the number of bytes in the range
  */
 public record ByteRange(long offset, int length) implements Serializable, Comparable<ByteRange> {
+    /**
+     * Compact constructor that validates the byte range parameters.
+     */
     public ByteRange {
         if (offset < 0) {
             throw new IllegalArgumentException("offset can't be < 0: " + offset);

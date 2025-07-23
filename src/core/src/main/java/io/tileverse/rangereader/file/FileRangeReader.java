@@ -27,10 +27,38 @@ import java.nio.file.StandardOpenOption;
 import java.util.Objects;
 
 /**
- * A thread-safe file-based implementation of RangeReader.
- * <p>
- * This implementation uses a FileChannel with position-based reads to safely handle
- * concurrent access from multiple threads without interference.
+ * A thread-safe file-based implementation of {@link RangeReader} that provides efficient random access to local files.
+ *
+ * <p>This implementation uses NIO {@link FileChannel} with position-based reads ({@link FileChannel#read(ByteBuffer, long)})
+ * to ensure thread safety. Unlike traditional stream-based file access, position-based reads allow multiple threads
+ * to read from different parts of the same file concurrently without interference, as each read operation specifies
+ * its absolute position in the file.
+ *
+ * <h2>Thread Safety</h2>
+ * <p>This class is fully thread-safe for concurrent read operations. The underlying {@link FileChannel} supports
+ * simultaneous reads from multiple threads as long as each operation uses absolute positioning, which this
+ * implementation guarantees.
+ *
+ * <h2>Performance Characteristics</h2>
+ * <p>FileRangeReader provides excellent performance for random access patterns typical in tiled data access:
+ * <ul>
+ * <li>Zero-copy operations where possible through direct ByteBuffer usage</li>
+ * <li>Efficient random access without seek overhead</li>
+ * <li>OS-level caching benefits for frequently accessed file regions</li>
+ * <li>No synchronization overhead between concurrent read operations</li>
+ * </ul>
+ *
+ * <h2>Usage Example</h2>
+ * <pre>{@code
+ * // Create reader for a PMTiles file
+ * Path pmtilesFile = Paths.get("data/world.pmtiles");
+ * try (FileRangeReader reader = FileRangeReader.of(pmtilesFile)) {
+ *     // Read tile data from different threads concurrently
+ *     ByteBuffer tileData = reader.readRange(offset, length);
+ * }
+ * }</pre>
+ *
+ * @see FileChannel#read(ByteBuffer, long)
  */
 public class FileRangeReader extends AbstractRangeReader implements RangeReader {
 
@@ -38,10 +66,15 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
     private final Path path;
 
     /**
-     * Creates a new FileRangeReader for the specified file.
+     * Creates a new FileRangeReader for the specified file path.
      *
-     * @param path The path to the file
-     * @throws IOException If an I/O error occurs
+     * <p>Opens the file with read-only access using {@link StandardOpenOption#READ}. The file
+     * must exist and be readable, otherwise an {@link IOException} will be thrown.
+     *
+     * @param path the path to the file to read from (must not be null)
+     * @throws IOException if the file cannot be opened for reading (e.g., file doesn't exist,
+     *                     insufficient permissions, or other I/O errors)
+     * @throws NullPointerException if path is null
      */
     public FileRangeReader(Path path) throws IOException {
         Objects.requireNonNull(path, "Path cannot be null");
@@ -49,6 +82,23 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
         this.channel = FileChannel.open(path, StandardOpenOption.READ);
     }
 
+    /**
+     * Performs the actual range read operation using thread-safe positioned reads.
+     *
+     * <p>This method implements the core reading logic using {@link FileChannel#read(ByteBuffer, long)}
+     * which provides thread-safe access by specifying absolute file positions. Multiple threads can
+     * call this method concurrently without synchronization, as each read operation is independent
+     * and doesn't affect the channel's position.
+     *
+     * <p>The method handles partial reads that may occur with large requests or when approaching
+     * end-of-file, ensuring the requested range is read completely or until EOF is reached.
+     *
+     * @param offset the absolute position in the file to start reading from
+     * @param actualLength the number of bytes to read
+     * @param target the ByteBuffer to read data into (limit will be adjusted)
+     * @return the actual number of bytes read, which may be less than actualLength if EOF is reached
+     * @throws IOException if an I/O error occurs during reading
+     */
     @Override
     protected int readRangeNoFlip(long offset, int actualLength, ByteBuffer target) throws IOException {
 
@@ -61,7 +111,7 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
 
         while (totalRead < actualLength) {
             // Use the position-based read method for thread safety
-            // This allows concurrent reads without interference
+            // This allows concurrent reads without interference from other threads
             int read = channel.read(target, currentPosition);
             if (read == -1) {
                 // End of file reached
@@ -74,27 +124,57 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
         return totalRead;
     }
 
+    /**
+     * Returns the size of the file in bytes.
+     *
+     * <p>This method is thread-safe as {@link FileChannel#size()} is inherently thread-safe
+     * and doesn't modify any shared state.
+     *
+     * @return the size of the file in bytes
+     * @throws IOException if an I/O error occurs while determining the file size
+     */
     @Override
     public long size() throws IOException {
-        // size() is thread-safe in FileChannel
         return channel.size();
     }
 
+    /**
+     * Returns a string identifier for this file source.
+     *
+     * <p>The identifier is the absolute path of the file, which uniquely identifies
+     * the data source for logging, caching, and debugging purposes.
+     *
+     * @return the absolute path of the file as a string
+     */
     @Override
     public String getSourceIdentifier() {
         return path.toAbsolutePath().toString();
     }
 
+    /**
+     * Closes the underlying file channel and releases any associated system resources.
+     *
+     * <p>This method is thread-safe and idempotent - it can be called multiple times
+     * without harm. After closing, any further attempts to read from this FileRangeReader
+     * will result in a {@link java.nio.channels.ClosedChannelException}.
+     *
+     * <p>It is recommended to use this FileRangeReader in a try-with-resources statement
+     * to ensure proper resource cleanup.
+     *
+     * @throws IOException if an I/O error occurs while closing the channel
+     */
     @Override
     public void close() throws IOException {
-        // close() is thread-safe in FileChannel
         channel.close();
     }
 
     /**
-     * Creates a new builder for FileRangeReader.
+     * Creates a new builder for constructing FileRangeReader instances.
      *
-     * @return a new builder instance
+     * <p>The builder pattern provides a flexible way to configure FileRangeReader
+     * construction with various path specification methods (Path, String, URI).
+     *
+     * @return a new builder instance for configuring FileRangeReader construction
      */
     public static Builder builder() {
         return new Builder();
