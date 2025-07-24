@@ -121,6 +121,9 @@ nav:
     - Glossary: arc42/glossary.md
 
 extra:
+  analytics:
+    provider: google
+    property: G-510Y1KN03V
   version:
     provider: mike
   social:
