@@ -10,6 +10,23 @@
   <description>A Java 17 library for reading content from multiple sources using range readers</description>
   <url>https://tileverse.io</url>
 
+  <licenses>
+    <license>
+      <name>Apache License 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Gabriel Roldan</name>
+      <email>gabriel.roldan@gmail.com</email>
+      <organization>Multiversio LLC</organization>
+      <organizationUrl>https://multivers.io</organizationUrl>
+    </developer>
+  </developers>
+
   <modules>
     <module>dependencies</module>
     <module>bom</module>
@@ -28,6 +45,17 @@
     <system>GitHub Issues</system>
     <url>https://github.com/tileverse-io/tileverse-rangereader/issues</url>
   </issueManagement>
+
+  <distributionManagement>
+    <repository>
+      <id>central</id>
+      <url>https://central.sonatype.com/api/v1/publisher/deployments/upload</url>
+    </repository>
+    <snapshotRepository>
+      <id>central</id>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
 
   <properties>
     <!-- CI-friendly version management -->
@@ -137,6 +165,19 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+  <repositories>
+    <repository>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+      <id>central-portal-snapshots</id>
+      <name>Central Portal Snapshots</name>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+    </repository>
+  </repositories>
 
   <build>
     <pluginManagement>
@@ -271,6 +312,17 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>flatten-maven-plugin</artifactId>
           <version>1.6.0</version>
+        </plugin>
+        <!-- Central Portal Publishing -->
+        <plugin>
+          <groupId>org.sonatype.central</groupId>
+          <artifactId>central-publishing-maven-plugin</artifactId>
+          <version>0.8.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>3.2.8</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -425,6 +477,48 @@
         <spotless.skip>true</spotless.skip>
         <sortpom.skip>true</sortpom.skip>
       </properties>
+    </profile>
+
+    <!-- Central Portal Publishing Profile -->
+    <profile>
+      <id>central-publish</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <deploymentName>Tileverse Range Reader</deploymentName>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+              <excludeArtifacts>
+                <excludeArtifact>tileverse-rangereader-benchmarks</excludeArtifact>
+              </excludeArtifacts>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <phase>verify</phase>
+                <configuration>
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>
