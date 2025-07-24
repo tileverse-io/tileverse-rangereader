@@ -119,7 +119,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
 
     @Override
     protected RangeReader createBaseReader() throws IOException {
-        return new HttpRangeReader(testFileUri);
+        return HttpRangeReader.of(testFileUri);
     }
 
     /**
@@ -163,7 +163,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
         URI invalidUri = URI.create(testFileUri.toString() + ".does-not-exist");
 
         // Constructor should succeed (lazy initialization)
-        HttpRangeReader reader = new HttpRangeReader(invalidUri);
+        HttpRangeReader reader = HttpRangeReader.of(invalidUri);
 
         // But calling size() should throw an IOException due to the invalid URL
         assertThrows(IOException.class, reader::size, "Calling size() with a nonexistent URL should throw IOException");

@@ -19,6 +19,8 @@ import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -65,55 +67,13 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     private volatile HttpResponse<Void> cachedHeadResponse = null;
 
     /**
-     * Creates a new HttpRangeReader for the specified URI with default settings.
-     * This constructor creates an HttpClient that accepts all SSL certificates.
-     *
-     * @param uri The URI to read from
-     * @throws IOException If an I/O error occurs
-     */
-    public HttpRangeReader(URI uri) throws IOException {
-        this(uri, true);
-    }
-
-    /**
-     * Creates a new HttpRangeReader for the specified URI with control over SSL certificate validation.
-     *
-     * @param uri The URI to read from
-     * @param trustAllCertificates Whether to trust all SSL certificates
-     * @throws IOException If an I/O error occurs
-     */
-    public HttpRangeReader(URI uri, boolean trustAllCertificates) throws IOException {
-        this(
-                uri,
-                trustAllCertificates
-                        ? createTrustAllHttpClient()
-                        : HttpClient.newBuilder()
-                                .connectTimeout(Duration.ofSeconds(20))
-                                .build(),
-                null);
-    }
-
-    /**
-     * Creates a new HttpRangeReader with authentication.
-     *
-     * @param uri The URI to read from
-     * @param authentication The authentication mechanism to use
-     * @throws IOException If an I/O error occurs
-     */
-    public HttpRangeReader(URI uri, HttpAuthentication authentication) throws IOException {
-        this(uri, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build(), authentication);
-    }
-
-    /**
      * Creates a new HttpRangeReader with authentication and control over SSL certificate validation.
      *
      * @param uri The URI to read from
      * @param trustAllCertificates Whether to trust all SSL certificates
      * @param authentication The authentication mechanism to use
-     * @throws IOException If an I/O error occurs
      */
-    public HttpRangeReader(URI uri, boolean trustAllCertificates, HttpAuthentication authentication)
-            throws IOException {
+    HttpRangeReader(@NonNull URI uri, boolean trustAllCertificates, HttpAuthentication authentication) {
         this(
                 uri,
                 trustAllCertificates
@@ -125,12 +85,36 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     }
 
     /**
+     * Creates a new HttpRangeReader with a custom HTTP client.
+     *
+     * @param uri The URI to read from
+     * @param httpClient The HttpClient to use
+     */
+    HttpRangeReader(URI uri, HttpClient httpClient) {
+        this(uri, httpClient, null);
+    }
+
+    /**
+     * Creates a new HttpRangeReader with a custom HTTP client and authentication.
+     *
+     * @param uri The URI to read from
+     * @param httpClient The HttpClient to use
+     * @param authentication The authentication mechanism to use, or null for no authentication
+     */
+    HttpRangeReader(@NonNull URI uri, @NonNull HttpClient httpClient, HttpAuthentication authentication) {
+        this.uri = uri;
+        this.httpClient = httpClient;
+        this.authentication = authentication; // Can be null for no authentication
+        // Content length and range support will be checked when size() is first called
+    }
+
+    /**
      * Creates an HttpClient that accepts all SSL certificates.
      *
      * @return An HttpClient configured to trust all SSL certificates
      * @throws IOException If there's an error setting up the SSL context
      */
-    private static HttpClient createTrustAllHttpClient() throws IOException {
+    private static HttpClient createTrustAllHttpClient() {
         try {
             // Create a trust manager that accepts all certificates
             TrustManager[] trustAllCerts = new TrustManager[] {
@@ -161,36 +145,8 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
 
         } catch (NoSuchAlgorithmException | KeyManagementException e) {
             LOGGER.log(Level.WARNING, "Failed to create trust-all SSL context, falling back to default", e);
-            throw new IOException("Failed to create SSL context for HTTPS", e);
+            throw new IllegalArgumentException("Failed to create SSL context for HTTPS", e);
         }
-    }
-
-    /**
-     * Creates a new HttpRangeReader with a custom HTTP client.
-     *
-     * @param uri The URI to read from
-     * @param httpClient The HttpClient to use
-     * @throws IOException If an I/O error occurs
-     */
-    public HttpRangeReader(URI uri, HttpClient httpClient) throws IOException {
-        this(uri, httpClient, null);
-    }
-
-    /**
-     * Creates a new HttpRangeReader with a custom HTTP client and authentication.
-     *
-     * @param uri The URI to read from
-     * @param httpClient The HttpClient to use
-     * @param authentication The authentication mechanism to use, or null for no authentication
-     * @throws IOException If an I/O error occurs
-     */
-    public HttpRangeReader(@NonNull URI uri, @NonNull HttpClient httpClient, HttpAuthentication authentication)
-            throws IOException {
-        this.uri = uri;
-        this.httpClient = httpClient;
-        this.authentication = authentication; // Can be null for no authentication
-
-        // Content length and range support will be checked when size() is first called
     }
 
     @Override
@@ -403,12 +359,95 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     }
 
     /**
+     * Creates a new HttpRangeReader for the specified URL string with default settings.
+     *
+     * <p>This is the simplest way to create an HttpRangeReader for basic HTTP/HTTPS access
+     * without authentication or custom SSL configuration. Uses default SSL certificate
+     * validation (does not trust all certificates).
+     *
+     * <p>This is equivalent to:
+     * <pre>{@code
+     * HttpRangeReader.builder(url).build();
+     * }</pre>
+     *
+     * @param url the HTTP or HTTPS URL string to read from
+     * @return a new HttpRangeReader instance with default configuration
+     * @throws IllegalArgumentException if the URL is malformed or has an unsupported scheme
+     */
+    public static HttpRangeReader of(String url) {
+        return builder(url).build();
+    }
+
+    /**
+     * Creates a new HttpRangeReader for the specified URI with default settings.
+     *
+     * <p>This is the simplest way to create an HttpRangeReader for basic HTTP/HTTPS access
+     * without authentication or custom SSL configuration. Uses default SSL certificate
+     * validation (does not trust all certificates).
+     *
+     * <p>This is equivalent to:
+     * <pre>{@code
+     * HttpRangeReader.builder(uri).build();
+     * }</pre>
+     *
+     * @param url the HTTP or HTTPS URI to read from
+     * @return a new HttpRangeReader instance with default configuration
+     * @throws IllegalArgumentException if the URI has an unsupported scheme (must be http or https)
+     */
+    public static HttpRangeReader of(URI url) {
+        return builder(url).build();
+    }
+
+    /**
+     * Creates a new HttpRangeReader for the specified URL with default settings.
+     *
+     * <p>This is a convenience method for creating an HttpRangeReader from a java.net.URL
+     * instance. The URL is converted to a URI internally. Uses default SSL certificate
+     * validation (does not trust all certificates).
+     *
+     * <p>This is equivalent to:
+     * <pre>{@code
+     * HttpRangeReader.builder(url.toURI()).build();
+     * }</pre>
+     *
+     * @param url the HTTP or HTTPS URL to read from
+     * @return a new HttpRangeReader instance with default configuration
+     * @throws IllegalArgumentException if the URL cannot be converted to a valid URI
+     *                                  or has an unsupported scheme (must be http or https)
+     */
+    public static HttpRangeReader of(URL url) {
+        try {
+            return builder(url.toURI()).build();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    /**
      * Creates a new builder for HttpRangeReader.
      *
      * @return a new builder instance
      */
     public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Create a builder for the given URL
+     * @param url the URL to pre configure the builder for
+     * @return builder ready for url
+     */
+    public static Builder builder(String url) {
+        return new Builder(URI.create(url));
+    }
+
+    /**
+     * Create a builder for the given URL
+     * @param url the URL to pre configure the builder for
+     * @return builder ready for url
+     */
+    public static Builder builder(URI url) {
+        return new Builder(url);
     }
 
     /**
@@ -420,6 +459,10 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         private io.tileverse.rangereader.http.HttpAuthentication authentication;
 
         private Builder() {}
+
+        public Builder(URI uri) {
+            this.uri = uri;
+        }
 
         /**
          * Sets the HTTP URI.
@@ -511,18 +554,13 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
          * Builds the HttpRangeReader.
          *
          * @return a new HttpRangeReader instance
-         * @throws IOException if an error occurs during construction
          */
-        public HttpRangeReader build() throws IOException {
+        public HttpRangeReader build() {
             if (uri == null) {
                 throw new IllegalStateException("URI must be set");
             }
 
-            if (authentication != null) {
-                return new HttpRangeReader(uri, trustAllCertificates, authentication);
-            } else {
-                return new HttpRangeReader(uri, trustAllCertificates);
-            }
+            return new HttpRangeReader(uri, trustAllCertificates, authentication);
         }
     }
 }

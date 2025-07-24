@@ -48,24 +48,10 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
      * @param objectName The GCS object name
      * @throws IOException If an I/O error occurs
      */
-    public GoogleCloudStorageRangeReader(Storage storage, String bucket, String objectName) throws IOException {
+    GoogleCloudStorageRangeReader(Storage storage, String bucket, String objectName) throws IOException {
         this.storage = Objects.requireNonNull(storage, "Storage client cannot be null");
         this.bucket = Objects.requireNonNull(bucket, "Bucket name cannot be null");
         this.objectName = Objects.requireNonNull(objectName, "Object name cannot be null");
-
-        // Check if the object exists and get its content length
-        try {
-            BlobId blobId = BlobId.of(bucket, objectName);
-            Blob blob = storage.get(blobId);
-
-            if (blob == null || !blob.exists()) {
-                throw new IOException("GCS object does not exist: gs://" + bucket + "/" + objectName);
-            }
-
-            this.contentLength = blob.getSize();
-        } catch (StorageException e) {
-            throw new IOException("Failed to access GCS object: " + e.getMessage(), e);
-        }
     }
 
     @Override
@@ -117,11 +103,14 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
                 BlobId blobId = BlobId.of(bucket, objectName);
                 Blob blob = storage.get(blobId);
 
-                if (blob == null) {
+                if (blob == null || !blob.exists()) {
                     throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
                 }
 
                 contentLength = blob.getSize();
+                if (contentLength < 0L) {
+                    throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
+                }
             } catch (StorageException e) {
                 throw new IOException("Failed to get GCS object size: " + e.getMessage(), e);
             }

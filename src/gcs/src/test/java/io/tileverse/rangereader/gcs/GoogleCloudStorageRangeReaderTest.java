@@ -200,28 +200,13 @@ class GoogleCloudStorageRangeReaderTest {
         assertThrows(IllegalArgumentException.class, () -> reader.readRange(0, -1));
     }
 
-    @Test
-    void testObjectNotExists() {
-        // Override the default behavior for this specific test
-        when(storage.get(BlobId.of(BUCKET, OBJECT_NAME))).thenReturn(null);
-
-        assertThrows(IOException.class, () -> new GoogleCloudStorageRangeReader(storage, BUCKET, OBJECT_NAME));
-    }
-
+    @SuppressWarnings("resource")
     @Test
     void testObjectExistsReturnsFalse() {
         // Override the default behavior for this specific test
         when(blob.exists()).thenReturn(false);
 
-        assertThrows(IOException.class, () -> new GoogleCloudStorageRangeReader(storage, BUCKET, OBJECT_NAME));
-    }
-
-    @Test
-    void testStorageExceptionDuringConstruction() {
-        // Override the default behavior for this specific test
-        when(storage.get(BlobId.of(BUCKET, OBJECT_NAME))).thenThrow(new StorageException(404, "Object not found"));
-
-        assertThrows(IOException.class, () -> new GoogleCloudStorageRangeReader(storage, BUCKET, OBJECT_NAME));
+        assertThrows(IOException.class, () -> new GoogleCloudStorageRangeReader(storage, BUCKET, OBJECT_NAME).size());
     }
 
     @Test
@@ -267,10 +252,6 @@ class GoogleCloudStorageRangeReaderTest {
         // Create reader successfully with -1 size
         try (GoogleCloudStorageRangeReader failingReader =
                 new GoogleCloudStorageRangeReader(storage, BUCKET, OBJECT_NAME)) {
-
-            // Now make size() fail when called
-            when(storage.get(BlobId.of(BUCKET, OBJECT_NAME))).thenReturn(null);
-
             assertThrows(IOException.class, () -> failingReader.size());
         }
     }

@@ -49,7 +49,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_cachesLargerBlockButReturnsOnlyRequestedBytes() throws IOException {
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Configure with 4KB block alignment
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -75,7 +75,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_reusesBlockForOverlappingRequests() throws IOException {
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Configure with 4KB block alignment
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -102,7 +102,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_withSpanningRequest() throws IOException {
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Configure with 4KB block alignment
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -132,7 +132,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
 
     @Test
     void noBlockAlignment_cachesExactlyWhatWasRequested() throws IOException {
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Configure without block alignment (default)
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -155,7 +155,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
     @Test
     void blockAlignment_builderMethods() throws IOException {
         // Test different builder methods - each creates its own base reader
-        try (RangeReader baseReader1 = new FileRangeReader(testFile);
+        try (RangeReader baseReader1 = FileRangeReader.of(testFile);
                 DiskCachingRangeReader reader1 = DiskCachingRangeReader.builder(baseReader1)
                         .cacheDirectory(cacheDir.resolve("reader1"))
                         .withBlockAlignment() // Uses default 1MB
@@ -166,7 +166,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
             assertThat(reader1.getEstimatedCacheSizeBytes()).isEqualTo(102400); // File is only 100KB
         }
 
-        try (RangeReader baseReader2 = new FileRangeReader(testFile);
+        try (RangeReader baseReader2 = FileRangeReader.of(testFile);
                 DiskCachingRangeReader reader2 = DiskCachingRangeReader.builder(baseReader2)
                         .cacheDirectory(cacheDir.resolve("reader2"))
                         .blockSize(8192) // Custom 8KB blocks
@@ -177,7 +177,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
             assertThat(reader2.getEstimatedCacheSizeBytes()).isEqualTo(8192);
         }
 
-        try (RangeReader baseReader3 = new FileRangeReader(testFile);
+        try (RangeReader baseReader3 = FileRangeReader.of(testFile);
                 DiskCachingRangeReader reader3 = DiskCachingRangeReader.builder(baseReader3)
                         .cacheDirectory(cacheDir.resolve("reader3"))
                         .withoutBlockAlignment() // Disable alignment
@@ -191,7 +191,7 @@ class DiskCachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_eofHandling_avoidsRedundantRequests() throws IOException {
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Configure with 16KB block alignment (file is 100KB = 102400 bytes)
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)

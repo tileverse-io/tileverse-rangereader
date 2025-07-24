@@ -71,7 +71,11 @@ public class CloudAuthenticationExample {
                 .credentialsProvider(DefaultCredentialsProvider.builder().build())
                 .region(Region.US_EAST_1)
                 .build();
-        RangeReader explicitReader = new S3RangeReader(s3Client, "example-bucket", "path/to/file.pmtiles");
+        RangeReader explicitReader = S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket("example-bucket")
+                .key("path/to/file.pmtiles")
+                .build();
 
         // Clean up resources
         defaultReader.close();

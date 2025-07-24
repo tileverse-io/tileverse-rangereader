@@ -16,6 +16,7 @@
 package io.tileverse.rangereader.file;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.tileverse.rangereader.RangeReader;
@@ -24,6 +25,7 @@ import io.tileverse.rangereader.it.TestUtil;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,7 +64,7 @@ public class FileRangeReaderIT extends AbstractRangeReaderIT {
 
     @Override
     protected RangeReader createBaseReader() throws IOException {
-        return new FileRangeReader(testFilePath);
+        return FileRangeReader.of(testFilePath);
     }
 
     /**
@@ -89,23 +91,14 @@ public class FileRangeReaderIT extends AbstractRangeReaderIT {
         }
     }
 
-    @SuppressWarnings("resource")
     @Test
     void testFileRangeReaderWithNonExistentFile() {
         // Test creating a reader with a file that doesn't exist
         Path nonExistentFile = tempDir.resolve("non-existent-file.bin");
-
-        try {
-            new FileRangeReader(nonExistentFile);
-            // The line above should throw an exception, so if we get here, the test failed
-            assertTrue(false, "Creating a reader with a non-existent file should throw an exception");
-        } catch (IOException e) {
-            // Expected exception
-            assertTrue(
-                    e.getMessage().contains("NoSuchFileException")
-                            || e.getMessage().contains("non-existent-file.bin"),
-                    "Exception should mention the missing file");
-        }
+        NoSuchFileException exception =
+                assertThrows(NoSuchFileException.class, () -> FileRangeReader.of(nonExistentFile));
+        assertTrue(
+                exception.getMessage().contains("non-existent-file.bin"), "Exception should mention the missing file");
     }
 
     @Test

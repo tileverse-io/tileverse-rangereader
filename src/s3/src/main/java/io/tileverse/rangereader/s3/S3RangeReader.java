@@ -54,7 +54,7 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
      * @param key The S3 object key
      * @throws IOException If an I/O error occurs
      */
-    public S3RangeReader(S3Client s3Client, String bucket, String key) throws IOException {
+    S3RangeReader(S3Client s3Client, String bucket, String key) throws IOException {
         this.s3Client = Objects.requireNonNull(s3Client, "S3Client cannot be null");
         this.bucket = Objects.requireNonNull(bucket, "Bucket name cannot be null");
         this.key = Objects.requireNonNull(key, "Object key cannot be null");

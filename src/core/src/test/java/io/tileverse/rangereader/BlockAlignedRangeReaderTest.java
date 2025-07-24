@@ -55,7 +55,7 @@ class BlockAlignedRangeReaderTest {
         Files.writeString(testFile, textContent, StandardOpenOption.CREATE);
 
         // Initialize the readers
-        fileReader = new FileRangeReader(testFile);
+        fileReader = FileRangeReader.of(testFile);
         reader = new BlockAlignedRangeReader(fileReader, TEST_BLOCK_SIZE);
     }
 

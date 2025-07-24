@@ -44,7 +44,7 @@ import java.util.Objects;
  * <li>{@link GoogleCloudStorageRangeReader#builder()}</li>
  * <li>{@link CachingRangeReader#builder(RangeReader)}</li>
  * <li>{@link DiskCachingRangeReader#builder(RangeReader)}</li>
- * <li>{@link BlockAlignedRangeReader#builder()}</li>
+ * <li>{@link BlockAlignedRangeReader#builder(RangeReader)}</li>
  * </ul>
  *
  * @deprecated Use individual builders instead for better type safety and cleaner APIs
@@ -79,7 +79,7 @@ public class RangeReaderBuilder {
      * @return an HttpRangeReader builder
      */
     public static HttpRangeReader.Builder http(URI uri) {
-        return HttpRangeReader.builder().uri(uri);
+        return HttpRangeReader.builder(uri);
     }
 
     /**
@@ -173,7 +173,7 @@ public class RangeReaderBuilder {
      * @return a BlockAlignedRangeReader builder
      */
     public static BlockAlignedRangeReader.Builder blockAligned(RangeReader delegate) {
-        return BlockAlignedRangeReader.builder().delegate(delegate);
+        return BlockAlignedRangeReader.builder(delegate);
     }
 
     /**
@@ -193,7 +193,7 @@ public class RangeReaderBuilder {
 
         return switch (scheme.toLowerCase()) {
             case "file" -> FileRangeReader.builder().uri(uri).build();
-            case "http", "https" -> HttpRangeReader.builder().uri(uri).build();
+            case "http", "https" -> HttpRangeReader.builder(uri).build();
             case "s3" -> S3RangeReader.builder().uri(uri).build();
             case "azure", "blob" -> AzureBlobRangeReader.builder().uri(uri).build();
             case "gs" -> GoogleCloudStorageRangeReader.builder().uri(uri).build();
@@ -211,7 +211,7 @@ public class RangeReaderBuilder {
      */
     public static RangeReader withOptimizations(RangeReader baseReader) {
         return CachingRangeReader.builder(
-                        BlockAlignedRangeReader.builder().delegate(baseReader).build())
+                        BlockAlignedRangeReader.builder(baseReader).build())
                 .build();
     }
 
@@ -228,8 +228,7 @@ public class RangeReaderBuilder {
     @Deprecated
     public static RangeReader withFullCaching(RangeReader baseReader, Path diskCacheDirectory, String sourceIdentifier)
             throws IOException {
-        return CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder(baseReader)
+        return CachingRangeReader.builder(BlockAlignedRangeReader.builder(DiskCachingRangeReader.builder(baseReader)
                                 .cacheDirectory(diskCacheDirectory)
                                 .build())
                         .build())
@@ -245,8 +244,7 @@ public class RangeReaderBuilder {
      * @throws IOException if an error occurs
      */
     public static RangeReader withFullCaching(RangeReader baseReader, Path diskCacheDirectory) throws IOException {
-        return CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder(baseReader)
+        return CachingRangeReader.builder(BlockAlignedRangeReader.builder(DiskCachingRangeReader.builder(baseReader)
                                 .cacheDirectory(diskCacheDirectory)
                                 .build())
                         .build())

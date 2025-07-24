@@ -72,8 +72,8 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for block-aligned reader
         start = System.currentTimeMillis();
-        try (RangeReader reader = BlockAlignedRangeReader.builder()
-                .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = BlockAlignedRangeReader.builder(
+                        FileRangeReader.builder().path(testFile).build())
                 .blockSize(4096)
                 .build()) {
 
@@ -115,8 +115,8 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for combined readers (block-aligned and cached)
         start = System.currentTimeMillis();
-        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(
+                                FileRangeReader.builder().path(testFile).build())
                         .blockSize(4096)
                         .build())
                 .build()) {
@@ -183,8 +183,8 @@ public class RangeReaderPerformanceTest {
 
         // Measure time for combined readers (block-aligned and cached)
         start = System.currentTimeMillis();
-        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(HttpRangeReader.builder().uri(httpUri).build())
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(
+                                HttpRangeReader.builder().uri(httpUri).build())
                         .blockSize(16384)
                         .build())
                 .build()) {

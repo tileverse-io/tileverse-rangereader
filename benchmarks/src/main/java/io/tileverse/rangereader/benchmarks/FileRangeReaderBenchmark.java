@@ -33,7 +33,7 @@ public class FileRangeReaderBenchmark extends AbstractRangeReaderBenchmark {
 
     @Override
     protected RangeReader createBaseReader() throws IOException {
-        return new FileRangeReader(testFilePath);
+        return FileRangeReader.of(testFilePath);
     }
 
     @Override

@@ -69,7 +69,7 @@ public class RangeReaderDecoratorIT {
     @Test
     void testBlockAlignedReaderBasicFunctionality() throws IOException {
         // Create a base reader
-        FileRangeReader baseReader = new FileRangeReader(testFile);
+        FileRangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create block-aligned reader with default block size
         try (BlockAlignedRangeReader reader = new BlockAlignedRangeReader(baseReader)) {
@@ -99,7 +99,7 @@ public class RangeReaderDecoratorIT {
     @Test
     void testBlockAlignedReaderWithCustomBlockSize() throws IOException {
         // Create a base reader
-        FileRangeReader baseReader = new FileRangeReader(testFile);
+        FileRangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create block-aligned reader with custom block size
         try (BlockAlignedRangeReader reader = new BlockAlignedRangeReader(baseReader, CUSTOM_BLOCK_SIZE)) {
@@ -126,7 +126,7 @@ public class RangeReaderDecoratorIT {
     @Test
     void testCachingReaderBasicFunctionality() throws IOException {
         // Create a base reader
-        FileRangeReader baseReader = new FileRangeReader(testFile);
+        FileRangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create caching reader
         try (CachingRangeReader reader = CachingRangeReader.builder(baseReader).build()) {
@@ -158,7 +158,7 @@ public class RangeReaderDecoratorIT {
     @Test
     void testCombinedBlockAlignedAndCachingReader() throws IOException {
         // Create a combined reader using RangeReaderFactory helpers
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // First, wrap with BlockAlignedRangeReader, then with CachingRangeReader
         try (RangeReader reader = RangeReaderFactory.createBlockAlignedCaching(baseReader, CUSTOM_BLOCK_SIZE)) {
@@ -189,8 +189,8 @@ public class RangeReaderDecoratorIT {
     @Test
     void testRangeReaderBuilderWithDecorators() throws IOException {
         // Use the builder to create a reader with both decorators
-        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(
+                                FileRangeReader.builder().path(testFile).build())
                         .blockSize(CUSTOM_BLOCK_SIZE)
                         .build())
                 .build()) {
@@ -236,8 +236,8 @@ public class RangeReaderDecoratorIT {
         // Create a reader with a large block size
         int largeBlockSize = 32 * 1024; // 32KB
 
-        try (RangeReader reader = BlockAlignedRangeReader.builder()
-                .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = BlockAlignedRangeReader.builder(
+                        FileRangeReader.builder().path(testFile).build())
                 .blockSize(largeBlockSize)
                 .build()) {
 
@@ -273,8 +273,8 @@ public class RangeReaderDecoratorIT {
     @Test
     void testRandomizedReads() throws IOException {
         // Create a reader with both caching and block alignment
-        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(
+                                FileRangeReader.builder().path(testFile).build())
                         .blockSize(DEFAULT_BLOCK_SIZE)
                         .build())
                 .build()) {

@@ -76,11 +76,11 @@ public class RangeReaderFactory {
 
         switch (scheme.toLowerCase()) {
             case "file":
-                return new FileRangeReader(java.nio.file.Paths.get(uri));
+                return FileRangeReader.of(java.nio.file.Paths.get(uri));
 
             case "http":
             case "https":
-                return new HttpRangeReader(uri);
+                return HttpRangeReader.builder(uri).build();
 
             case "s3":
                 // Parse bucket and key from S3 URI (s3://bucket/key)
@@ -260,7 +260,11 @@ public class RangeReaderFactory {
         }
 
         S3Client s3Client = builder.build();
-        return new S3RangeReader(s3Client, bucket, key);
+        return S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket(bucket)
+                .key(key)
+                .build();
     }
 
     /**
@@ -283,8 +287,8 @@ public class RangeReaderFactory {
         }
 
         // Parse bucket and key from S3 URI (s3://bucket/key)
-        String authority = uri.getAuthority();
-        if (authority == null || authority.isEmpty()) {
+        String bucket = uri.getAuthority();
+        if (bucket == null || bucket.isEmpty()) {
             throw new IllegalArgumentException("S3 URI must have a bucket: " + uri);
         }
 
@@ -301,7 +305,11 @@ public class RangeReaderFactory {
                 .region(region)
                 .build();
 
-        return new S3RangeReader(s3Client, authority, key);
+        return S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket(bucket)
+                .key(key)
+                .build();
     }
 
     /**
@@ -326,8 +334,8 @@ public class RangeReaderFactory {
         }
 
         // Parse bucket and key from S3 URI (s3://bucket/key)
-        String authority = uri.getAuthority();
-        if (authority == null || authority.isEmpty()) {
+        String bucket = uri.getAuthority();
+        if (bucket == null || bucket.isEmpty()) {
             throw new IllegalArgumentException("S3 URI must have a bucket: " + uri);
         }
 
@@ -344,7 +352,11 @@ public class RangeReaderFactory {
                 .region(region)
                 .build();
 
-        return new S3RangeReader(s3Client, authority, key);
+        return S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket(bucket)
+                .key(key)
+                .build();
     }
 
     /**
@@ -379,7 +391,7 @@ public class RangeReaderFactory {
         }
 
         BlobClient blobClient = blobClientBuilder.buildClient();
-        return new AzureBlobRangeReader(blobClient);
+        return AzureBlobRangeReader.of(blobClient);
     }
 
     /**
@@ -412,7 +424,7 @@ public class RangeReaderFactory {
         BlobClient blobClient =
                 new BlobClientBuilder().endpoint(blobUrl).credential(credential).buildClient();
 
-        return new AzureBlobRangeReader(blobClient);
+        return AzureBlobRangeReader.of(blobClient);
     }
 
     /**
@@ -445,7 +457,7 @@ public class RangeReaderFactory {
                 .blobName(blobPath)
                 .buildClient();
 
-        return new AzureBlobRangeReader(blobClient);
+        return AzureBlobRangeReader.of(blobClient);
     }
 
     /**
@@ -481,7 +493,7 @@ public class RangeReaderFactory {
                 .sasToken(sasToken)
                 .buildClient();
 
-        return new AzureBlobRangeReader(blobClient);
+        return AzureBlobRangeReader.of(blobClient);
     }
 
     /**
@@ -508,7 +520,7 @@ public class RangeReaderFactory {
                 .blobName(blobPath)
                 .buildClient();
 
-        return new AzureBlobRangeReader(blobClient);
+        return AzureBlobRangeReader.of(blobClient);
     }
 
     /**
@@ -526,7 +538,11 @@ public class RangeReaderFactory {
         Objects.requireNonNull(objectName, "Object name cannot be null");
 
         Storage storage = StorageOptions.getDefaultInstance().getService();
-        return new GoogleCloudStorageRangeReader(storage, bucket, objectName);
+        return GoogleCloudStorageRangeReader.builder()
+                .storage(storage)
+                .bucket(bucket)
+                .objectName(objectName)
+                .build();
     }
 
     /**
@@ -579,7 +595,11 @@ public class RangeReaderFactory {
         Objects.requireNonNull(bucket, "Bucket name cannot be null");
         Objects.requireNonNull(objectName, "Object name cannot be null");
 
-        return new GoogleCloudStorageRangeReader(storage, bucket, objectName);
+        return GoogleCloudStorageRangeReader.builder()
+                .storage(storage)
+                .bucket(bucket)
+                .objectName(objectName)
+                .build();
     }
 
     /**
@@ -603,6 +623,10 @@ public class RangeReaderFactory {
         Storage storage =
                 StorageOptions.newBuilder().setProjectId(projectId).build().getService();
 
-        return new GoogleCloudStorageRangeReader(storage, bucket, objectName);
+        return GoogleCloudStorageRangeReader.builder()
+                .storage(storage)
+                .bucket(bucket)
+                .objectName(objectName)
+                .build();
     }
 }
