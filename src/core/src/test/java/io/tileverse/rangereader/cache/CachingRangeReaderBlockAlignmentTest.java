@@ -47,7 +47,7 @@ class CachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_cachesLargerBlockButReturnsOnlyRequestedBytes() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader cachingReader = CachingRangeReader.builder(baseReader)
                         .maximumSize(100) // Prevent eviction during test
                         .blockSize(4096) // 4KB blocks
@@ -71,7 +71,7 @@ class CachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_reusesBlockForOverlappingRequests() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader cachingReader = CachingRangeReader.builder(baseReader)
                         .maximumSize(100) // Prevent eviction during test
                         .blockSize(4096) // 4KB blocks
@@ -96,7 +96,7 @@ class CachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_withSpanningRequest() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader cachingReader = CachingRangeReader.builder(baseReader)
                         .maximumSize(100) // Prevent eviction during test
                         .blockSize(4096) // 4KB blocks
@@ -124,7 +124,7 @@ class CachingRangeReaderBlockAlignmentTest {
 
     @Test
     void noBlockAlignment_cachesExactlyWhatWasRequested() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader cachingReader = CachingRangeReader.builder(baseReader)
                         .maximumSize(100) // Prevent eviction during test
                         .withoutBlockAlignment() // Explicitly disable
@@ -145,7 +145,7 @@ class CachingRangeReaderBlockAlignmentTest {
     @Test
     void blockAlignment_builderMethods() throws IOException {
         // Test different builder methods
-        try (RangeReader baseReader1 = new FileRangeReader(testFile);
+        try (RangeReader baseReader1 = FileRangeReader.of(testFile);
                 CachingRangeReader reader1 = CachingRangeReader.builder(baseReader1)
                         .maximumSize(100)
                         .withBlockAlignment() // Uses default 64KB
@@ -156,7 +156,7 @@ class CachingRangeReaderBlockAlignmentTest {
             assertThat(reader1.getEstimatedCacheSizeBytes()).isEqualTo(65536); // Default 64KB block
         }
 
-        try (RangeReader baseReader2 = new FileRangeReader(testFile);
+        try (RangeReader baseReader2 = FileRangeReader.of(testFile);
                 CachingRangeReader reader2 = CachingRangeReader.builder(baseReader2)
                         .maximumSize(100)
                         .blockSize(8192) // Custom 8KB blocks
@@ -167,7 +167,7 @@ class CachingRangeReaderBlockAlignmentTest {
             assertThat(reader2.getEstimatedCacheSizeBytes()).isEqualTo(8192);
         }
 
-        try (RangeReader baseReader3 = new FileRangeReader(testFile);
+        try (RangeReader baseReader3 = FileRangeReader.of(testFile);
                 CachingRangeReader reader3 = CachingRangeReader.builder(baseReader3)
                         .maximumSize(100)
                         .withoutBlockAlignment() // Disable alignment
@@ -181,7 +181,7 @@ class CachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_defaultBehaviorWithoutConfiguration() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader cachingReader = CachingRangeReader.builder(baseReader)
                         .maximumSize(100) // Prevent eviction during test
                         .build()) { // No block alignment configuration
@@ -200,7 +200,7 @@ class CachingRangeReaderBlockAlignmentTest {
 
     @Test
     void blockAlignment_eofHandling_avoidsRedundantRequests() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader cachingReader = CachingRangeReader.builder(baseReader)
                         .maximumSize(100) // Prevent eviction during test
                         .blockSize(16384) // 16KB blocks

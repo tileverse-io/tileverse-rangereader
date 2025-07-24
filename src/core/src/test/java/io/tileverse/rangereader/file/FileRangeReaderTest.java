@@ -65,7 +65,7 @@ public class FileRangeReaderTest {
         Files.writeString(testFile, textContent, StandardOpenOption.CREATE);
 
         // Initialize the reader
-        reader = new FileRangeReader(testFile);
+        reader = FileRangeReader.of(testFile);
     }
 
     @AfterEach
@@ -78,13 +78,13 @@ public class FileRangeReaderTest {
 
     @Test
     void testConstructorWithNullPath() {
-        assertThrows(NullPointerException.class, () -> new FileRangeReader(null));
+        assertThrows(NullPointerException.class, () -> FileRangeReader.of(null));
     }
 
     @Test
-    void testConstructorWithNonExistentFile() {
+    void testNonExistentFile() {
         Path nonExistentFile = tempDir.resolve("non-existent-file.txt");
-        assertThrows(NoSuchFileException.class, () -> new FileRangeReader(nonExistentFile));
+        assertThrows(NoSuchFileException.class, () -> FileRangeReader.of(nonExistentFile));
     }
 
     @Test
@@ -242,7 +242,7 @@ public class FileRangeReaderTest {
         new Random(42).nextBytes(binaryContent); // Use seed 42 for reproducibility
         Files.write(binaryFile, binaryContent, StandardOpenOption.CREATE);
 
-        try (FileRangeReader binaryReader = new FileRangeReader(binaryFile)) {
+        try (FileRangeReader binaryReader = FileRangeReader.of(binaryFile)) {
             // Check size
             assertEquals(binaryContent.length, binaryReader.size());
 
@@ -278,7 +278,7 @@ public class FileRangeReaderTest {
 
         Files.write(largeFile, largeContent, StandardOpenOption.CREATE);
 
-        try (FileRangeReader largeReader = new FileRangeReader(largeFile)) {
+        try (FileRangeReader largeReader = FileRangeReader.of(largeFile)) {
             // Check size
             assertEquals(size, largeReader.size());
 
@@ -305,7 +305,7 @@ public class FileRangeReaderTest {
         Path emptyFile = tempDir.resolve("empty.txt");
         Files.createFile(emptyFile);
 
-        try (FileRangeReader emptyReader = new FileRangeReader(emptyFile)) {
+        try (FileRangeReader emptyReader = FileRangeReader.of(emptyFile)) {
             // Size should be 0
             assertEquals(0, emptyReader.size());
 
@@ -339,7 +339,7 @@ public class FileRangeReaderTest {
         Files.write(concurrentFile, data, StandardOpenOption.CREATE);
 
         // Create a shared reader - our implementation should be thread-safe
-        FileRangeReader sharedReader = new FileRangeReader(concurrentFile);
+        FileRangeReader sharedReader = FileRangeReader.of(concurrentFile);
 
         try {
             // Define regions to read concurrently
@@ -415,7 +415,7 @@ public class FileRangeReaderTest {
         Files.write(concurrentFile, data, StandardOpenOption.CREATE);
 
         // Create a shared reader
-        FileRangeReader sharedReader = new FileRangeReader(concurrentFile);
+        FileRangeReader sharedReader = FileRangeReader.of(concurrentFile);
 
         try {
             // Multiple threads will read overlapping regions

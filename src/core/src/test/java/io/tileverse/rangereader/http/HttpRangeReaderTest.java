@@ -94,7 +94,7 @@ class HttpRangeReaderTest {
         // Individual range request stubs - we'll create these for each test as needed
 
         // Create reader
-        reader = new HttpRangeReader(testUri);
+        reader = HttpRangeReader.of(testUri);
     }
 
     @Test
@@ -281,7 +281,7 @@ class HttpRangeReaderTest {
         URI noRangeUri = URI.create("http://localhost:" + TEST_PORT + "/no-range");
 
         // Should throw when readRange() is called (triggering range support initialization)
-        HttpRangeReader reader = new HttpRangeReader(noRangeUri);
+        HttpRangeReader reader = HttpRangeReader.of(noRangeUri);
         assertThrows(IOException.class, () -> reader.readRange(0, 100));
     }
 
@@ -309,7 +309,7 @@ class HttpRangeReaderTest {
         URI ignoreRangeUri = URI.create("http://localhost:" + TEST_PORT + "/ignore-range");
 
         // Should throw IOException when server doesn't support range requests (returns 200 instead of 206)
-        try (HttpRangeReader ignoreRangeReader = new HttpRangeReader(ignoreRangeUri)) {
+        try (HttpRangeReader ignoreRangeReader = HttpRangeReader.of(ignoreRangeUri)) {
             assertThrows(IOException.class, () -> ignoreRangeReader.readRange(offset, length));
         }
     }
@@ -337,15 +337,13 @@ class HttpRangeReaderTest {
         URI errorUri = URI.create("http://localhost:" + TEST_PORT + "/error");
 
         // Should be able to create the reader
-        try (HttpRangeReader errorReader = new HttpRangeReader(errorUri)) {
+        try (HttpRangeReader errorReader = HttpRangeReader.of(errorUri)) {
             // But reading a range should throw
             assertThrows(IOException.class, () -> errorReader.readRange(offset, length));
 
             // Verify that range request was made
             wm.verify(
                     getRequestedFor(urlEqualTo("/error")).withHeader("Range", equalTo("bytes=" + offset + "-" + end)));
-        } catch (IOException e) {
-            fail("Should not throw during construction: " + e.getMessage());
         }
     }
 
@@ -361,7 +359,7 @@ class HttpRangeReaderTest {
             // This should not throw despite being an HTTPS URL
             // We're just testing that the constructor accepts it
             // It will fail at runtime when it tries to connect, but that's expected
-            new HttpRangeReader(httpsUri) {
+            new HttpRangeReader(httpsUri, false, null) {
                 // Override methods to prevent actual network requests
                 @Override
                 public ByteBuffer readRange(long offset, int length) throws IOException {
@@ -478,11 +476,9 @@ class HttpRangeReaderTest {
 
         URI noContentLengthUri = URI.create("http://localhost:" + TEST_PORT + "/no-content-length");
 
-        try (HttpRangeReader reader = new HttpRangeReader(noContentLengthUri)) {
+        try (HttpRangeReader reader = new HttpRangeReader(noContentLengthUri, false, null)) {
             // size() should throw when content length is missing
             assertThrows(IOException.class, () -> reader.size());
-        } catch (IOException e) {
-            fail("Should not throw during construction: " + e.getMessage());
         }
     }
 
@@ -502,7 +498,7 @@ class HttpRangeReaderTest {
 
         // This reader will be used to verify the exception is thrown for invalid content length
         @SuppressWarnings("resource")
-        HttpRangeReader reader = new HttpRangeReader(invalidContentLengthUri) {
+        HttpRangeReader reader = new HttpRangeReader(invalidContentLengthUri, false, null) {
             @Override
             public long size() throws IOException {
                 // Simulate a NumberFormatException when parsing content length
@@ -523,7 +519,7 @@ class HttpRangeReaderTest {
         URI nonExistentUri = URI.create("http://non-existent-host.example/test.pmtiles");
 
         // Should throw when size() is called (triggering initialization)
-        HttpRangeReader reader = new HttpRangeReader(nonExistentUri);
+        HttpRangeReader reader = HttpRangeReader.of(nonExistentUri);
         assertThrows(IOException.class, reader::size);
     }
 
@@ -536,7 +532,7 @@ class HttpRangeReaderTest {
         URI serverErrorUri = URI.create("http://localhost:" + TEST_PORT + "/server-error");
 
         // Should throw when size() is called (triggering initialization)
-        HttpRangeReader reader = new HttpRangeReader(serverErrorUri);
+        HttpRangeReader reader = HttpRangeReader.of(serverErrorUri);
         assertThrows(IOException.class, reader::size);
     }
 }

@@ -90,7 +90,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testFileRangeReader_TargetBuffer() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test a full read
             ByteBuffer target = ByteBuffer.allocate(textContent.length());
             int bytesRead = reader.readRange(0, textContent.length(), target);
@@ -120,7 +120,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testFileRangeReader_TargetBuffer_EOFHandling() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test a read that goes beyond EOF
             int beyondEOFOffset = textContent.length() - 5;
             int beyondEOFLength = 10; // Only 5 bytes are available
@@ -150,7 +150,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testFileRangeReader_TargetBuffer_LargerBuffer() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test with a buffer larger than needed
             ByteBuffer largeTarget = ByteBuffer.allocate(textContent.length() * 2);
             int offset = 5;
@@ -178,7 +178,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testFileRangeReader_TargetBuffer_ExistingPosition() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test with a buffer that already has data (position > 0)
             ByteBuffer target = ByteBuffer.allocate(textContent.length());
 
@@ -214,7 +214,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testBlockAlignedRangeReader_TargetBuffer() throws IOException {
-        try (FileRangeReader baseReader = new FileRangeReader(testFile);
+        try (FileRangeReader baseReader = FileRangeReader.of(testFile);
                 BlockAlignedRangeReader reader = new BlockAlignedRangeReader(baseReader, 16)) {
 
             // Test a read that spans multiple blocks
@@ -236,7 +236,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testCachingRangeReader_TargetBuffer() throws IOException {
-        try (FileRangeReader baseReader = new FileRangeReader(testFile);
+        try (FileRangeReader baseReader = FileRangeReader.of(testFile);
                 CachingRangeReader reader =
                         CachingRangeReader.builder(baseReader).build()) {
 
@@ -268,7 +268,7 @@ public class RangeReaderBufferTest {
         Path cacheDir = tempDir.resolve("cache");
         Files.createDirectories(cacheDir);
 
-        try (FileRangeReader baseReader = new FileRangeReader(testFile);
+        try (FileRangeReader baseReader = FileRangeReader.of(testFile);
                 DiskCachingRangeReader reader = DiskCachingRangeReader.builder(baseReader)
                         .cacheDirectory(cacheDir)
                         .build()) {
@@ -298,7 +298,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testDirectBuffer() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test with a direct buffer
             ByteBuffer directBuffer = ByteBuffer.allocateDirect(textContent.length());
 
@@ -323,7 +323,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testMultipleConsecutiveReads() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Single buffer for multiple reads
             ByteBuffer target = ByteBuffer.allocate(textContent.length());
 
@@ -373,7 +373,7 @@ public class RangeReaderBufferTest {
     @Test
     void testMultiLevelNestedReaders_TargetBuffer() throws IOException {
         // Create a multi-level nested reader setup
-        FileRangeReader baseReader = new FileRangeReader(testFile);
+        FileRangeReader baseReader = FileRangeReader.of(testFile);
         BlockAlignedRangeReader blockReader = new BlockAlignedRangeReader(baseReader, 16);
         CachingRangeReader cachingReader =
                 CachingRangeReader.builder(blockReader).build();
@@ -398,7 +398,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testZeroLengthRead() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test a zero-length read
             ByteBuffer target = ByteBuffer.allocate(10);
 
@@ -419,7 +419,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testReadIntoExistingData() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Create a buffer and pre-fill it with some data
             ByteBuffer target = ByteBuffer.allocate(100);
             String prefix = "PREFIX_DATA_";
@@ -453,7 +453,7 @@ public class RangeReaderBufferTest {
         // Read from the binary file for large data testing
         Path binaryFile = tempDir.resolve("test.bin");
 
-        try (FileRangeReader reader = new FileRangeReader(binaryFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(binaryFile)) {
             // Test reading in chunks of various sizes
             int[] chunkSizes = {1024, 4096, 8192, 16384, 32768};
 
@@ -487,7 +487,7 @@ public class RangeReaderBufferTest {
 
     @Test
     void testExceptionHandlingForInvalidParameters() throws IOException {
-        try (FileRangeReader reader = new FileRangeReader(testFile)) {
+        try (FileRangeReader reader = FileRangeReader.of(testFile)) {
             // Test with negative offset
             ByteBuffer target = ByteBuffer.allocate(10);
             assertThrows(

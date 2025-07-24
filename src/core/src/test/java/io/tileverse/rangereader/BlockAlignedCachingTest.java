@@ -58,7 +58,7 @@ class BlockAlignedCachingTest {
         Files.writeString(testFile, textContent, StandardOpenOption.CREATE);
 
         // Initialize the readers - this shows the decorator pattern in action
-        fileReader = new FileRangeReader(testFile);
+        fileReader = FileRangeReader.of(testFile);
         countingReader = new CountingRangeReader(fileReader);
         blockAlignedReader = new BlockAlignedRangeReader(countingReader, TEST_BLOCK_SIZE);
         cachingReader = CachingRangeReader.builder(blockAlignedReader).build();

@@ -295,7 +295,7 @@ public class HttpRangeReaderAuthenticationIT {
     @Test
     void testPublicFileAccess() throws IOException {
         // Test access to a public file (no authentication required)
-        try (RangeReader reader = new HttpRangeReader(publicFileUri)) {
+        try (RangeReader reader = HttpRangeReader.of(publicFileUri)) {
             // Verify size
             assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
 
@@ -312,7 +312,7 @@ public class HttpRangeReaderAuthenticationIT {
         // Test that accessing basic auth protected resource without credentials fails
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(basicAuthUri),
+                () -> HttpRangeReader.of(basicAuthUri),
                 "Accessing basic auth protected resource without credentials should throw IOException");
     }
 
@@ -321,7 +321,8 @@ public class HttpRangeReaderAuthenticationIT {
         // Test accessing basic auth protected resource with correct credentials
         BasicAuthentication auth = new BasicAuthentication(BASIC_AUTH_USER, BASIC_AUTH_PASSWORD);
 
-        try (RangeReader reader = new HttpRangeReader(basicAuthUri, auth)) {
+        try (RangeReader reader =
+                HttpRangeReader.builder(basicAuthUri).authentication(auth).build()) {
             // Verify size
             assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
 
@@ -338,15 +339,14 @@ public class HttpRangeReaderAuthenticationIT {
 
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(basicAuthUri, auth),
+                () -> HttpRangeReader.builder(basicAuthUri).authentication(auth).build(),
                 "Accessing basic auth protected resource with incorrect credentials should throw IOException");
     }
 
     @Test
     void testBasicAuthWithBuilder() throws IOException {
         // Test accessing basic auth protected resource with RangeReaderBuilder
-        try (RangeReader reader = HttpRangeReader.builder()
-                .uri(basicAuthUri)
+        try (RangeReader reader = HttpRangeReader.builder(basicAuthUri)
                 .basicAuth(BASIC_AUTH_USER, BASIC_AUTH_PASSWORD)
                 .build()) {
 
@@ -369,7 +369,7 @@ public class HttpRangeReaderAuthenticationIT {
         // Test that accessing bearer token protected resource without token fails
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(bearerTokenUri),
+                () -> HttpRangeReader.of(bearerTokenUri),
                 "Accessing bearer token protected resource without token should throw IOException");
     }
 
@@ -378,7 +378,8 @@ public class HttpRangeReaderAuthenticationIT {
         // Test accessing bearer token protected resource with correct token
         BearerTokenAuthentication auth = new BearerTokenAuthentication(BEARER_TOKEN);
 
-        try (RangeReader reader = new HttpRangeReader(bearerTokenUri, auth)) {
+        try (RangeReader reader =
+                HttpRangeReader.builder(bearerTokenUri).authentication(auth).build()) {
             // Verify size
             assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
 
@@ -395,7 +396,9 @@ public class HttpRangeReaderAuthenticationIT {
 
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(bearerTokenUri, auth),
+                () -> HttpRangeReader.builder(bearerTokenUri)
+                        .authentication(auth)
+                        .build(),
                 "Accessing bearer token protected resource with incorrect token should throw IOException");
     }
 
@@ -423,16 +426,16 @@ public class HttpRangeReaderAuthenticationIT {
         // Test that accessing API key protected resource without API key fails
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(apiKeyUri),
+                () -> HttpRangeReader.builder(apiKeyUri).build(),
                 "Accessing API key protected resource without API key should throw IOException");
     }
 
     @Test
     void testApiKeyWithCorrectKey() throws IOException {
         // Test accessing API key protected resource with correct API key
-        ApiKeyAuthentication auth = new ApiKeyAuthentication(API_KEY_HEADER, API_KEY);
-
-        try (RangeReader reader = new HttpRangeReader(apiKeyUri, auth)) {
+        try (RangeReader reader = HttpRangeReader.builder(apiKeyUri)
+                .apiKey(API_KEY_HEADER, API_KEY)
+                .build()) {
             // Verify size
             assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
 
@@ -445,19 +448,18 @@ public class HttpRangeReaderAuthenticationIT {
     @Test
     void testApiKeyWithIncorrectKey() {
         // Test that accessing API key protected resource with incorrect API key fails
-        ApiKeyAuthentication auth = new ApiKeyAuthentication(API_KEY_HEADER, "wrong-key");
-
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(apiKeyUri, auth),
+                () -> HttpRangeReader.builder(apiKeyUri)
+                        .apiKey(API_KEY_HEADER, "wrong-key")
+                        .build(),
                 "Accessing API key protected resource with incorrect API key should throw IOException");
     }
 
     @Test
     void testApiKeyWithBuilder() throws IOException {
         // Test accessing API key protected resource with RangeReaderBuilder
-        try (RangeReader reader = HttpRangeReader.builder()
-                .uri(apiKeyUri)
+        try (RangeReader reader = HttpRangeReader.builder(apiKeyUri)
                 .apiKey(API_KEY_HEADER, API_KEY)
                 .build()) {
 
@@ -477,7 +479,7 @@ public class HttpRangeReaderAuthenticationIT {
         // Test that accessing custom header protected resource without header fails
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(customHeaderUri),
+                () -> HttpRangeReader.of(customHeaderUri),
                 "Accessing custom header protected resource without header should throw IOException");
     }
 
@@ -488,7 +490,8 @@ public class HttpRangeReaderAuthenticationIT {
         headers.put(CUSTOM_HEADER_NAME, CUSTOM_HEADER_VALUE);
         CustomHeaderAuthentication auth = new CustomHeaderAuthentication(headers);
 
-        try (RangeReader reader = new HttpRangeReader(customHeaderUri, auth)) {
+        try (RangeReader reader =
+                HttpRangeReader.builder(customHeaderUri).authentication(auth).build()) {
             // Verify size
             assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
 
@@ -507,7 +510,9 @@ public class HttpRangeReaderAuthenticationIT {
 
         assertThrows(
                 IOException.class,
-                () -> new HttpRangeReader(customHeaderUri, auth),
+                () -> HttpRangeReader.builder(customHeaderUri)
+                        .authentication(auth)
+                        .build(),
                 "Accessing custom header protected resource with incorrect header value should throw IOException");
     }
 
@@ -516,9 +521,9 @@ public class HttpRangeReaderAuthenticationIT {
     @Test
     void testMultipleAuthenticatedRangeRequests() throws IOException {
         // Test multiple consecutive authenticated range requests
-        BasicAuthentication auth = new BasicAuthentication(BASIC_AUTH_USER, BASIC_AUTH_PASSWORD);
-
-        try (RangeReader reader = new HttpRangeReader(basicAuthUri, auth)) {
+        try (RangeReader reader = HttpRangeReader.builder(basicAuthUri)
+                .basicAuth(API_KEY, BASIC_AUTH_PASSWORD)
+                .build()) {
             // Make multiple range requests
             for (int i = 0; i < 5; i++) {
                 int offset = i * 5000;

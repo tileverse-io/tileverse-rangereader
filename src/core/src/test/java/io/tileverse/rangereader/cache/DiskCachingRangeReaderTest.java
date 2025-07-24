@@ -103,7 +103,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testBasicCaching() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -145,7 +145,7 @@ public class DiskCachingRangeReaderTest {
         assertTrue(countCacheFiles(cacheDir) > 0, "Cache directory should contain files");
 
         // Create a new reader to test using existing cache
-        try (RangeReader baseReader2 = new FileRangeReader(testFile);
+        try (RangeReader baseReader2 = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader2 = DiskCachingRangeReader.builder(baseReader2)
                         .cacheDirectory(cacheDir)
                         .build()) {
@@ -164,7 +164,7 @@ public class DiskCachingRangeReaderTest {
         // Create cache with small max size
         final long maxCacheSize = 1000; // 1KB
 
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
                         .cacheDirectory(cacheDir)
                         .maxCacheSizeBytes(maxCacheSize)
@@ -192,7 +192,7 @@ public class DiskCachingRangeReaderTest {
 
     @Test
     void testClearCache() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
                         .cacheDirectory(cacheDir)
                         .build()) {
@@ -225,9 +225,9 @@ public class DiskCachingRangeReaderTest {
         Files.createDirectories(cacheDir1);
         Files.createDirectories(cacheDir2);
 
-        try (RangeReader baseReader = new FileRangeReader(testFile)) {
+        try (RangeReader baseReader = FileRangeReader.of(testFile)) {
             // Create two caching readers with different cache directories
-            try (RangeReader baseReader2 = new FileRangeReader(testFile);
+            try (RangeReader baseReader2 = FileRangeReader.of(testFile);
                     DiskCachingRangeReader reader1 = DiskCachingRangeReader.builder(baseReader)
                             .cacheDirectory(cacheDir1)
                             .build();
@@ -254,8 +254,8 @@ public class DiskCachingRangeReaderTest {
         // Test that multiple DiskCachingRangeReader instances for the same source
         // can share the same cache directory and cache files correctly.
         // Note: Each instance maintains its own cache view, so cache entry counts may differ
-        try (RangeReader baseReader1 = new FileRangeReader(testFile);
-                RangeReader baseReader2 = new FileRangeReader(testFile);
+        try (RangeReader baseReader1 = FileRangeReader.of(testFile);
+                RangeReader baseReader2 = FileRangeReader.of(testFile);
                 DiskCachingRangeReader reader1 = DiskCachingRangeReader.builder(baseReader1)
                         .cacheDirectory(cacheDir)
                         .build();
@@ -381,7 +381,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testBasicCachingWithExplicitBuffer() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -445,7 +445,7 @@ public class DiskCachingRangeReaderTest {
         assertTrue(countCacheFiles(cacheDir) > 0, "Cache directory should contain files");
 
         // Create a new reader to test using existing cache with explicit buffer
-        try (RangeReader baseReader2 = new FileRangeReader(testFile);
+        try (RangeReader baseReader2 = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader2 = DiskCachingRangeReader.builder(baseReader2)
                         .cacheDirectory(cacheDir)
                         .build()) {
@@ -470,7 +470,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testReadBeyondEndWithExplicitBuffer() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -505,7 +505,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testReadWithOffsetInBuffer() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -545,7 +545,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testInvalidBufferParameters() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -592,7 +592,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testReadWithDirectBuffer() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -625,7 +625,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testZeroLengthRead() throws IOException {
         // Create a file range reader
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
 
         // Create a disk caching reader
         try (DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
@@ -656,7 +656,7 @@ public class DiskCachingRangeReaderTest {
         // Create a custom RangeReader that counts reads
         RangeReader countingReader = new RangeReader() {
             @SuppressWarnings("resource")
-            private final RangeReader baseReader = new FileRangeReader(testFile);
+            private final RangeReader baseReader = FileRangeReader.of(testFile);
 
             @Override
             public ByteBuffer readRange(long offset, int length) throws IOException {
@@ -777,7 +777,7 @@ public class DiskCachingRangeReaderTest {
         // Create a custom RangeReader that counts reads
         RangeReader countingReader = new RangeReader() {
             @SuppressWarnings("resource")
-            private final RangeReader baseReader = new FileRangeReader(testFile);
+            private final RangeReader baseReader = FileRangeReader.of(testFile);
 
             @Override
             public ByteBuffer readRange(long offset, int length) throws IOException {
@@ -884,7 +884,7 @@ public class DiskCachingRangeReaderTest {
         // Create a disk caching reader with a small max size
         final long maxCacheSize = 2000; // 2KB
 
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
                         .cacheDirectory(cacheDir)
                         .maxCacheSizeBytes(maxCacheSize)
@@ -983,7 +983,7 @@ public class DiskCachingRangeReaderTest {
         Path testCacheDir = tempDir.resolve("test-delete-cache");
         Files.createDirectories(testCacheDir);
 
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
                         .cacheDirectory(testCacheDir)
                         .deleteOnClose()
@@ -1006,7 +1006,7 @@ public class DiskCachingRangeReaderTest {
         // Create a cache with very small max size (1KB)
         final long maxCacheSize = 1024;
 
-        try (RangeReader baseReader = new FileRangeReader(testFile);
+        try (RangeReader baseReader = FileRangeReader.of(testFile);
                 DiskCachingRangeReader cachingReader = DiskCachingRangeReader.builder(baseReader)
                         .cacheDirectory(cacheDir)
                         .maxCacheSizeBytes(maxCacheSize)
@@ -1042,7 +1042,7 @@ public class DiskCachingRangeReaderTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> {
-                    DiskCachingRangeReader.builder(new FileRangeReader(testFile))
+                    DiskCachingRangeReader.builder(FileRangeReader.of(testFile))
                             .maxCacheSizeBytes(0)
                             .build();
                 },
@@ -1052,7 +1052,7 @@ public class DiskCachingRangeReaderTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> {
-                    DiskCachingRangeReader.builder(new FileRangeReader(testFile))
+                    DiskCachingRangeReader.builder(FileRangeReader.of(testFile))
                             .maxCacheSizeBytes(-1)
                             .build();
                 },
@@ -1062,7 +1062,7 @@ public class DiskCachingRangeReaderTest {
     @Test
     void testBuilderMaxCacheSizeBytesDefault() throws IOException {
         // Test that builder uses default when maxCacheSizeBytes is not set
-        try (DiskCachingRangeReader reader = DiskCachingRangeReader.builder(new FileRangeReader(testFile))
+        try (DiskCachingRangeReader reader = DiskCachingRangeReader.builder(FileRangeReader.of(testFile))
                 .cacheDirectory(cacheDir)
                 .build()) {
 
@@ -1075,7 +1075,7 @@ public class DiskCachingRangeReaderTest {
 
     @Test
     void testConstructorMaxCacheSizeBytesValidation() throws IOException {
-        try (RangeReader baseReader = new FileRangeReader(testFile)) {
+        try (RangeReader baseReader = FileRangeReader.of(testFile)) {
             assertThrows(
                     IllegalArgumentException.class,
                     () -> {

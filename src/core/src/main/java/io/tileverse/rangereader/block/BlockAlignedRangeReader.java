@@ -170,11 +170,11 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
 
     /**
      * Creates a new builder for BlockAlignedRangeReader.
-     *
+     * @param delegate the decorated range reader
      * @return a new builder instance
      */
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(RangeReader delegate) {
+        return new Builder(delegate);
     }
 
     /**
@@ -184,7 +184,9 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
         private RangeReader delegate;
         private int blockSize = DEFAULT_BLOCK_SIZE;
 
-        private Builder() {}
+        private Builder(RangeReader delegate) {
+            this.delegate = delegate;
+        }
 
         /**
          * Sets the delegate RangeReader to wrap with block alignment.

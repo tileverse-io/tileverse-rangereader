@@ -69,8 +69,7 @@ public class DualBlockSizeRangeReaderTest {
     @Test
     void testBuilderWithDifferentBlockSizes() throws IOException {
         // Create a reader with different block sizes using the updated builder
-        RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder(
+        RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(DiskCachingRangeReader.builder(
                                         FileRangeReader.builder().path(testFile).build())
                                 .cacheDirectory(cacheDir)
                                 .build())
@@ -105,7 +104,7 @@ public class DualBlockSizeRangeReaderTest {
     @Test
     void testManualConstructionWithDifferentBlockSizes() throws IOException {
         // Create a reader with different block sizes manually
-        RangeReader baseReader = new FileRangeReader(testFile);
+        RangeReader baseReader = FileRangeReader.of(testFile);
         RangeReader diskCache = DiskCachingRangeReader.builder(baseReader)
                 .cacheDirectory(cacheDir)
                 .build();
@@ -137,8 +136,7 @@ public class DualBlockSizeRangeReaderTest {
     @Test
     void testDefaultBlockSizes() throws IOException {
         // Test with default block sizes
-        RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(DiskCachingRangeReader.builder(
+        RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(DiskCachingRangeReader.builder(
                                         FileRangeReader.builder().path(testFile).build())
                                 .cacheDirectory(cacheDir)
                                 .build())

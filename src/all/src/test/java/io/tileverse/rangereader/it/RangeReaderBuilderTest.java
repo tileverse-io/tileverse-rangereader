@@ -125,8 +125,8 @@ public class RangeReaderBuilderTest {
         Files.write(testFile, new byte[100]);
 
         // Build a block-aligned RangeReader
-        try (RangeReader reader = BlockAlignedRangeReader.builder()
-                .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = BlockAlignedRangeReader.builder(
+                        FileRangeReader.builder().path(testFile).build())
                 .blockSize(BlockAlignedRangeReader.DEFAULT_BLOCK_SIZE)
                 .build()) {
 
@@ -152,8 +152,8 @@ public class RangeReaderBuilderTest {
         int customBlockSize = 4096;
 
         // Build a block-aligned RangeReader with custom block size
-        try (RangeReader reader = BlockAlignedRangeReader.builder()
-                .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = BlockAlignedRangeReader.builder(
+                        FileRangeReader.builder().path(testFile).build())
                 .blockSize(customBlockSize)
                 .build()) {
 
@@ -178,8 +178,8 @@ public class RangeReaderBuilderTest {
         Files.write(testFile, new byte[100]);
 
         // Build a RangeReader with both caching and block alignment
-        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder()
-                        .delegate(FileRangeReader.builder().path(testFile).build())
+        try (RangeReader reader = CachingRangeReader.builder(BlockAlignedRangeReader.builder(
+                                FileRangeReader.builder().path(testFile).build())
                         .blockSize(BlockAlignedRangeReader.DEFAULT_BLOCK_SIZE)
                         .build())
                 .build()) {
@@ -238,7 +238,7 @@ public class RangeReaderBuilderTest {
 
         // Test negative block size
         Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-            BlockAlignedRangeReader.builder().delegate(baseReader).blockSize(-1024);
+            BlockAlignedRangeReader.builder(baseReader).blockSize(-1024);
         });
         assertTrue(
                 exception.getMessage().contains("must be positive"),
@@ -246,7 +246,7 @@ public class RangeReaderBuilderTest {
 
         // Test zero block size
         exception = assertThrows(IllegalArgumentException.class, () -> {
-            BlockAlignedRangeReader.builder().delegate(baseReader).blockSize(0);
+            BlockAlignedRangeReader.builder(baseReader).blockSize(0);
         });
         assertTrue(
                 exception.getMessage().contains("must be positive"),
@@ -254,7 +254,7 @@ public class RangeReaderBuilderTest {
 
         // Test non-power-of-2 block size
         exception = assertThrows(IllegalArgumentException.class, () -> {
-            BlockAlignedRangeReader.builder().delegate(baseReader).blockSize(1000); // Not a power of 2
+            BlockAlignedRangeReader.builder(baseReader).blockSize(1000); // Not a power of 2
         });
         assertTrue(
                 exception.getMessage().contains("power of 2"),

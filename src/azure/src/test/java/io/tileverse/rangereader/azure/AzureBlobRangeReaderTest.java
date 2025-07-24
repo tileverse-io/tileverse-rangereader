@@ -212,7 +212,7 @@ class AzureBlobRangeReaderTest {
         reset(blobClient);
         when(blobClient.exists()).thenReturn(false);
 
-        assertThrows(IOException.class, () -> new AzureBlobRangeReader(blobClient));
+        assertThrows(IOException.class, () -> AzureBlobRangeReader.of(blobClient));
     }
 
     @Test
@@ -221,6 +221,6 @@ class AzureBlobRangeReaderTest {
         reset(blobClient);
         when(blobClient.exists()).thenThrow(new RuntimeException("Failed to check blob existence"));
 
-        assertThrows(IOException.class, () -> new AzureBlobRangeReader(blobClient));
+        assertThrows(IOException.class, () -> AzureBlobRangeReader.of(blobClient));
     }
 }
