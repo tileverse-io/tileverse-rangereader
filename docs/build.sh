@@ -42,7 +42,16 @@ else
 fi
 
 # Activate virtual environment
+echo "Activating virtual environment: $VENV_DIR"
 source "$VENV_DIR/bin/activate"
+
+# Verify we're in the virtual environment
+if [[ "$VIRTUAL_ENV" != "$VENV_DIR" ]]; then
+    echo "❌ Failed to activate virtual environment"
+    exit 1
+fi
+
+echo "✅ Virtual environment activated: $VIRTUAL_ENV"
 
 # Upgrade pip and install dependencies
 echo "📦 Installing Python dependencies..."
