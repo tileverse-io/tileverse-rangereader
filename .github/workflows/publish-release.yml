@@ -33,7 +33,7 @@ jobs:
         passphrase: ${{ secrets.GPG_PASSPHRASE }}
         
     - name: Configure Maven settings
-      uses: s4u/maven-settings-action@v3
+      uses: s4u/maven-settings-action@v3.1.0
       with:
         servers: |
           [{
