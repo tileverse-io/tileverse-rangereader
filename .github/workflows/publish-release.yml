@@ -14,6 +14,8 @@ on:
 jobs:
   publish-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout code
@@ -56,18 +58,16 @@ jobs:
       run: ./mvnw clean verify -Drevision=${{ env.RELEASE_VERSION }}
       
     - name: Publish release
-      run: ./mvnw deploy -Pcentral-publish -DskipTests -Drevision=${{ env.RELEASE_VERSION }}
+      if: ${{ !contains(github.event.head_commit.message, '[skip-publish]') }}
+      run: ./mvnw deploy -DskipTests -Drevision=${{ env.RELEASE_VERSION }} -Dgpg.skip=false
       env:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/v')
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ env.RELEASE_VERSION }}
+        name: Release ${{ env.RELEASE_VERSION }}
         draft: false
         prerelease: false
         body: |

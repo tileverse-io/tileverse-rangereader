@@ -65,6 +65,9 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>17</maven.compiler.release>
 
+    <!-- Skip GPG signing by default (enabled during publishing) -->
+    <gpg.skip>true</gpg.skip>
+
     <!-- Default formatter/linter properties, see the qa profile -->
     <fmt.skip>false</fmt.skip>
     <sortpom.skip>${fmt.skip}</sortpom.skip>
@@ -445,6 +448,44 @@
           </execution>
         </executions>
       </plugin>
+
+      <!-- Central Portal Publishing -->
+      <plugin>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <extensions>true</extensions>
+        <configuration>
+          <publishingServerId>central</publishingServerId>
+          <deploymentName>Tileverse Range Reader</deploymentName>
+          <autoPublish>true</autoPublish>
+          <waitUntil>published</waitUntil>
+          <excludeArtifacts>
+            <excludeArtifact>tileverse-rangereader-benchmarks</excludeArtifact>
+          </excludeArtifacts>
+        </configuration>
+      </plugin>
+
+      <!-- GPG Signing (only when publishing) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <goals>
+              <goal>sign</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <skip>${gpg.skip}</skip>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
@@ -479,46 +520,5 @@
       </properties>
     </profile>
 
-    <!-- Central Portal Publishing Profile -->
-    <profile>
-      <id>central-publish</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.sonatype.central</groupId>
-            <artifactId>central-publishing-maven-plugin</artifactId>
-            <extensions>true</extensions>
-            <configuration>
-              <publishingServerId>central</publishingServerId>
-              <deploymentName>Tileverse Range Reader</deploymentName>
-              <autoPublish>true</autoPublish>
-              <waitUntil>published</waitUntil>
-              <excludeArtifacts>
-                <excludeArtifact>tileverse-rangereader-benchmarks</excludeArtifact>
-              </excludeArtifacts>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-                <phase>verify</phase>
-                <configuration>
-                  <gpgArguments>
-                    <arg>--pinentry-mode</arg>
-                    <arg>loopback</arg>
-                  </gpgArguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
   </profiles>
 </project>

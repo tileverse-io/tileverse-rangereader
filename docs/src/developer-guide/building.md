@@ -495,7 +495,7 @@ Snapshots are **automatically published** to Maven Central when:
 **Workflow:** `.github/workflows/publish-snapshot.yml`
 
 - Triggers after successful completion of PR validation workflow
-- Uses GPG signing with organization secrets
+- Uses GPG signing with organization secrets (`-Dgpg.skip=false`)
 - Publishes to Maven Central via Sonatype Central Portal
 - Skippable with `[skip-publish]` in commit message
 
@@ -513,7 +513,7 @@ git push origin v1.0.0
 
 - Extracts version from tag (e.g., `v1.0.0` → `1.0.0`)
 - Runs full test suite with the release version
-- Signs artifacts with GPG
+- Signs artifacts with GPG (`-Dgpg.skip=false`)
 - Publishes to Maven Central
 - Creates GitHub release with Maven Central links
 
@@ -586,7 +586,7 @@ For testing the publishing process locally, you need to configure your `~/.m2/se
 ./mvnw clean install
 
 # Test Maven Central publishing (requires configuration above)
-./mvnw clean deploy -Pcentral-publish -Drevision=1.0.0-test
+./mvnw clean deploy -Drevision=1.0.0-test -Dgpg.skip=false
 ```
 
 ## Performance Considerations

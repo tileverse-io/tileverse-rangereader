@@ -40,11 +40,12 @@ jobs:
             "password": "${{ secrets.CENTRAL_TOKEN }}"
           }]
           
-    - name: Build and test
-      run: ./mvnw clean verify -DskipTests
+    - name: Build and test (manual trigger only)
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      run: ./mvnw clean verify
       
     - name: Publish snapshot
       if: ${{ !contains(github.event.head_commit.message, '[skip-publish]') }}
-      run: ./mvnw deploy -Pcentral-publish -DskipTests
+      run: ./mvnw deploy -DskipTests -Dgpg.skip=false
       env:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
