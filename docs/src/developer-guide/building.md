@@ -482,22 +482,111 @@ rm -rf ~/.m2/repository/io/tileverse/rangereader
 
 ## Release Process
 
-### Snapshot Builds
+The project uses **automated CI/CD pipelines** for publishing to Maven Central. All releases are handled through GitHub Actions workflows with proper quality gates, testing, and security.
+
+### Snapshot Publishing (Automated)
+
+Snapshots are **automatically published** to Maven Central when:
+
+1. Code is pushed to the `main` branch
+2. All PR validation tests pass (lint, build, integration tests across Java 17/21/24)
+3. The commit message doesn't contain `[skip-publish]`
+
+**Workflow:** `.github/workflows/publish-snapshot.yml`
+
+- Triggers after successful completion of PR validation workflow
+- Uses GPG signing with organization secrets
+- Publishes to Maven Central via Sonatype Central Portal
+- Skippable with `[skip-publish]` in commit message
+
+### Release Publishing (Automated)
+
+Releases are **automatically published** when you create a version tag:
 
 ```bash
-# Deploy snapshot to repository
-./mvnw clean deploy -Drevision=1.0-SNAPSHOT
-```
-
-### Release Builds
-
-```bash
-# Release version
-./mvnw clean deploy -Drevision=1.0.0
-
-# Tag release
+# Create and push a version tag
 git tag v1.0.0
 git push origin v1.0.0
+```
+
+**Workflow:** `.github/workflows/publish-release.yml`
+
+- Extracts version from tag (e.g., `v1.0.0` → `1.0.0`)
+- Runs full test suite with the release version
+- Signs artifacts with GPG
+- Publishes to Maven Central
+- Creates GitHub release with Maven Central links
+
+#### Manual Release (Alternative)
+
+You can also trigger a release manually without creating a tag:
+
+1. Go to Actions → "Publish Release"
+2. Click "Run workflow"
+3. Enter the desired version (e.g., `1.0.0`)
+
+### Required Secrets
+
+The following organization-level GitHub secrets must be configured:
+
+- `GPG_PRIVATE_KEY` - Exported GPG private key for artifact signing
+- `GPG_PASSPHRASE` - GPG key passphrase
+- `CENTRAL_USERNAME` - Sonatype Central Portal username
+- `CENTRAL_TOKEN` - Sonatype Central Portal token
+
+### GPG Key Setup
+
+For maintainers setting up GPG keys:
+
+```bash
+# Generate 4096-bit RSA key
+gpg --full-generate-key
+
+# Export for GitHub secrets
+gpg --armor --export-secret-keys [KEY-ID] > private-key.asc
+
+# Upload to keyservers
+gpg --keyserver keyserver.ubuntu.com --send-keys [KEY-ID]
+gpg --keyserver keys.openpgp.org --send-keys [KEY-ID]
+```
+
+### Local Development Publishing
+
+For testing the publishing process locally, you need to configure your `~/.m2/settings.xml`:
+
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>central</id>
+      <username>YOUR_SONATYPE_USERNAME</username>
+      <password>YOUR_SONATYPE_TOKEN</password>
+    </server>
+  </servers>
+  
+  <profiles>
+    <profile>
+      <id>gpg-config</id>
+      <properties>
+        <gpg.keyname>YOUR_GPG_KEY_ID</gpg.keyname>
+      </properties>
+    </profile>
+  </profiles>
+  
+  <activeProfiles>
+    <activeProfile>gpg-config</activeProfile>
+  </activeProfiles>
+</settings>
+```
+
+**Key Selection:** If you have multiple GPG keys with the same email, specify the exact key ID in the `gpg.keyname` property to ensure Maven uses the correct key for signing.
+
+```bash
+# Snapshot to local repository
+./mvnw clean install
+
+# Test Maven Central publishing (requires configuration above)
+./mvnw clean deploy -Pcentral-publish -Drevision=1.0.0-test
 ```
 
 ## Performance Considerations

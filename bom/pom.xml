@@ -9,6 +9,7 @@
   <artifactId>tileverse-rangereader-bom</artifactId>
   <packaging>pom</packaging>
   <name>Tileverse Range Reader BOM</name>
+  <description>Tileverse Range Reader BOM</description>
 
   <dependencyManagement>
     <dependencies>
