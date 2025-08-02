@@ -183,6 +183,20 @@
   </repositories>
 
   <build>
+    <resources>
+      <resource>
+        <targetPath>META-INF</targetPath>
+        <filtering>true</filtering>
+        <directory>${user.dir}</directory>
+        <includes>
+          <include>LICENSE</include>
+          <include>NOTICE</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/src/main/resources</directory>
+      </resource>
+    </resources>
     <pluginManagement>
       <plugins>
         <plugin>
