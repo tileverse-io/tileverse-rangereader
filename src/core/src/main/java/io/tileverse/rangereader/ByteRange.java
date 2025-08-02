@@ -40,4 +40,12 @@ public record ByteRange(long offset, int length) implements Serializable, Compar
     public int compareTo(ByteRange o) {
         return Long.compare(offset, o.offset());
     }
+
+    public ByteRange withOffset(long newOffset) {
+        return new ByteRange(newOffset, length());
+    }
+
+    public static ByteRange of(long offset, int length) {
+        return new ByteRange(offset, length);
+    }
 }

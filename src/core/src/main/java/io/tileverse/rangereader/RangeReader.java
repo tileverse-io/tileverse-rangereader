@@ -84,6 +84,10 @@ public interface RangeReader extends Closeable {
      */
     int readRange(long offset, int length, ByteBuffer target) throws IOException;
 
+    default int readRange(ByteRange range, ByteBuffer target) throws IOException {
+        return readRange(range.offset(), range.length(), target);
+    }
+
     /**
      * Gets the total size of the source in bytes.
      * <p>
