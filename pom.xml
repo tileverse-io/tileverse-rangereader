@@ -239,6 +239,10 @@
                     <version>[3.9.0,)</version>
                     <message>Maven 3.9.0 or newer is required</message>
                   </requireMavenVersion>
+                  <requireReleaseDeps>
+                    <onlyWhenRelease>true</onlyWhenRelease>
+                    <searchTransitive>true</searchTransitive>
+                  </requireReleaseDeps>
                 </rules>
               </configuration>
             </execution>
