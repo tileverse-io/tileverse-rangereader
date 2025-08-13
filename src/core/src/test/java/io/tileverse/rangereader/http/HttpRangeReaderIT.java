@@ -136,7 +136,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
             assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
 
             // Read some data to verify it works correctly
-            ByteBuffer buffer = reader.readRange(0, 10);
+            ByteBuffer buffer = reader.readRange(0, 10).flip();
             assertEquals(10, buffer.remaining(), "Should read 10 bytes");
         }
     }
@@ -179,12 +179,12 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
             // Make multiple consecutive range requests
             for (int i = 0; i < 5; i++) {
                 int offset = i * 1000;
-                ByteBuffer buffer = reader.readRange(offset, 100);
+                ByteBuffer buffer = reader.readRange(offset, 100).flip();
                 assertEquals(100, buffer.remaining(), "Range request " + i + " should return 100 bytes");
             }
 
             // Make a request at the end of the file
-            ByteBuffer endBuffer = reader.readRange(TEST_FILE_SIZE - 50, 100);
+            ByteBuffer endBuffer = reader.readRange(TEST_FILE_SIZE - 50, 100).flip();
             assertEquals(50, endBuffer.remaining(), "Range request at end of file should be truncated");
         }
     }
@@ -194,19 +194,19 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
         // Test a mix of small and large range requests
         try (RangeReader reader = createBaseReader()) {
             // Small range request (10 bytes)
-            ByteBuffer smallBuffer = reader.readRange(100, 10);
+            ByteBuffer smallBuffer = reader.readRange(100, 10).flip();
             assertEquals(10, smallBuffer.remaining(), "Small range request should return 10 bytes");
 
             // Medium range request (1KB)
-            ByteBuffer mediumBuffer = reader.readRange(5000, 1024);
+            ByteBuffer mediumBuffer = reader.readRange(5000, 1024).flip();
             assertEquals(1024, mediumBuffer.remaining(), "Medium range request should return 1024 bytes");
 
             // Large range request (10KB)
-            ByteBuffer largeBuffer = reader.readRange(10000, 10240);
+            ByteBuffer largeBuffer = reader.readRange(10000, 10240).flip();
             assertEquals(10240, largeBuffer.remaining(), "Large range request should return 10240 bytes");
 
             // Very large range request (50KB)
-            ByteBuffer veryLargeBuffer = reader.readRange(20000, 51200);
+            ByteBuffer veryLargeBuffer = reader.readRange(20000, 51200).flip();
             assertEquals(51200, veryLargeBuffer.remaining(), "Very large range request should return 51200 bytes");
         }
     }
@@ -221,7 +221,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
                 int startOffset = chunkSize - 100;
                 int length = 200;
 
-                ByteBuffer buffer = reader.readRange(startOffset, length);
+                ByteBuffer buffer = reader.readRange(startOffset, length).flip();
                 assertEquals(
                         length,
                         buffer.remaining(),

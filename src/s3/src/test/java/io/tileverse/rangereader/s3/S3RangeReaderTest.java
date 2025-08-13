@@ -136,6 +136,7 @@ class S3RangeReaderTest {
         when(getObjectResponse.contentLength()).thenReturn((long) CONTENT_LENGTH);
 
         ByteBuffer buffer = reader.readRange(0, CONTENT_LENGTH);
+        buffer.flip();
 
         assertEquals(CONTENT_LENGTH, buffer.remaining());
 
@@ -155,6 +156,7 @@ class S3RangeReaderTest {
         when(getObjectResponse.contentLength()).thenReturn((long) length);
 
         ByteBuffer buffer = reader.readRange(offset, length);
+        buffer.flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -175,6 +177,7 @@ class S3RangeReaderTest {
         when(getObjectResponse.contentLength()).thenReturn(200L);
 
         ByteBuffer buffer = reader.readRange(offset, length);
+        buffer.flip();
 
         // Should only return up to the end of the file
         assertEquals(200, buffer.remaining());
@@ -192,6 +195,7 @@ class S3RangeReaderTest {
     @Test
     void testReadZeroLength() throws IOException {
         ByteBuffer buffer = reader.readRange(100, 0);
+        buffer.flip();
 
         assertEquals(0, buffer.remaining());
 

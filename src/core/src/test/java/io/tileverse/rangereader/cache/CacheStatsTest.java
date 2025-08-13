@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.tileverse.rangereader.file.FileRangeReader;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
@@ -65,9 +66,10 @@ public class CacheStatsTest {
             assertEquals(0, memoryCache.getEstimatedCacheSizeBytes());
             assertEquals(0, diskCache.getEstimatedCacheSizeBytes());
 
+            ByteBuffer buff = ByteBuffer.allocate(1024);
             // Read some data to populate caches
-            memoryCache.readRange(1000, 500);
-            diskCache.readRange(1000, 500);
+            memoryCache.readRange(1000, 500, buff);
+            diskCache.readRange(1000, 500, buff);
 
             // Both should report cache entries
             assertTrue(memoryCache.getCacheEntryCount() > 0);
@@ -114,9 +116,10 @@ public class CacheStatsTest {
 
         try (CachingRangeReader reader = CachingRangeReader.builder(baseReader).build()) {
             // Generate some cache activity
-            reader.readRange(1000, 500); // miss
-            reader.readRange(1000, 500); // hit
-            reader.readRange(2000, 300); // miss
+            ByteBuffer buff = ByteBuffer.allocate(2048);
+            reader.readRange(1000, 500, buff); // miss
+            reader.readRange(1000, 500, buff); // hit
+            reader.readRange(2000, 300, buff); // miss
 
             CacheStats stats = reader.getCacheStats();
 

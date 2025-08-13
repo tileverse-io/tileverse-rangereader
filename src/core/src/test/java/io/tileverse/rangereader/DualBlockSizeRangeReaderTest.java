@@ -78,11 +78,15 @@ public class DualBlockSizeRangeReaderTest {
                 .build();
 
         // Test reading a range (should go through both block alignments)
-        ByteBuffer data = reader.readRange(1000, 500);
+        ByteBuffer data = ByteBuffer.allocate(1024);
+        reader.readRange(1000, 500, data);
+        data.flip();
         assertEquals(500, data.remaining(), "Should read 500 bytes");
 
         // Read the same range again (should now come from memory cache)
-        ByteBuffer cachedData = reader.readRange(1000, 500);
+        ByteBuffer cachedData = ByteBuffer.allocate(1024);
+        reader.readRange(1000, 500, cachedData);
+        cachedData.flip();
         assertEquals(500, cachedData.remaining(), "Should read 500 bytes from cache");
 
         // Verify data is the same
@@ -113,11 +117,15 @@ public class DualBlockSizeRangeReaderTest {
         RangeReader memBlocks = new BlockAlignedRangeReader(memCache, MEMORY_BLOCK_SIZE);
 
         // Test reading a range
-        ByteBuffer data = memBlocks.readRange(1000, 500);
+        ByteBuffer data = ByteBuffer.allocate(1024);
+        memBlocks.readRange(1000, 500, data);
+        data.flip();
         assertEquals(500, data.remaining(), "Should read 500 bytes");
 
         // Read the same range again (should now come from memory cache)
-        ByteBuffer cachedData = memBlocks.readRange(1000, 500);
+        ByteBuffer cachedData = ByteBuffer.allocate(1024);
+        memBlocks.readRange(1000, 500, cachedData);
+        cachedData.flip();
         assertEquals(500, cachedData.remaining(), "Should read 500 bytes from cache");
 
         // Verify data is the same
@@ -145,7 +153,9 @@ public class DualBlockSizeRangeReaderTest {
                 .build();
 
         // Test reading a range
-        ByteBuffer data = reader.readRange(1000, 500);
+        ByteBuffer data = ByteBuffer.allocate(1024);
+        reader.readRange(1000, 500, data);
+        data.flip();
         assertEquals(500, data.remaining(), "Should read 500 bytes");
 
         // Close the reader

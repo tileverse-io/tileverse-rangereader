@@ -94,7 +94,7 @@ public class FileRangeReaderTest {
 
     @Test
     void testReadEntireFile() throws IOException {
-        ByteBuffer buffer = reader.readRange(0, textContent.length());
+        ByteBuffer buffer = reader.readRange(0, textContent.length()).flip();
 
         assertEquals(textContent.length(), buffer.remaining());
 
@@ -108,7 +108,7 @@ public class FileRangeReaderTest {
     @Test
     void testReadRangeFromStart() throws IOException {
         int length = 10;
-        ByteBuffer buffer = reader.readRange(0, length);
+        ByteBuffer buffer = reader.readRange(0, length).flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -123,7 +123,7 @@ public class FileRangeReaderTest {
     void testReadRangeFromMiddle() throws IOException {
         int offset = 20;
         int length = 15;
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = reader.readRange(offset, length).flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -140,7 +140,7 @@ public class FileRangeReaderTest {
         int length = 10;
         ByteBuffer buffer = reader.readRange(offset, length);
 
-        assertEquals(length, buffer.remaining());
+        assertEquals(length, buffer.flip().remaining());
 
         byte[] bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
@@ -156,7 +156,7 @@ public class FileRangeReaderTest {
         ByteBuffer buffer = reader.readRange(offset, length);
 
         // Only 5 bytes should be read
-        assertEquals(5, buffer.remaining());
+        assertEquals(5, buffer.flip().remaining());
 
         byte[] bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
@@ -169,7 +169,7 @@ public class FileRangeReaderTest {
     void testReadStartingBeyondEnd() throws IOException {
         int offset = textContent.length() + 10; // Start beyond the end of the file
         int length = 10;
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = reader.readRange(offset, length).flip();
 
         // Should return an empty buffer
         assertEquals(0, buffer.remaining());
@@ -178,9 +178,9 @@ public class FileRangeReaderTest {
     @Test
     void testReadMultipleRanges() throws IOException {
         // Read multiple ranges and verify they're correct
-        ByteBuffer buffer1 = reader.readRange(5, 10);
-        ByteBuffer buffer2 = reader.readRange(20, 15);
-        ByteBuffer buffer3 = reader.readRange(50, 20);
+        ByteBuffer buffer1 = reader.readRange(5, 10).flip();
+        ByteBuffer buffer2 = reader.readRange(20, 15).flip();
+        ByteBuffer buffer3 = reader.readRange(50, 20).flip();
 
         byte[] bytes1 = new byte[buffer1.remaining()];
         buffer1.get(bytes1);
@@ -203,7 +203,7 @@ public class FileRangeReaderTest {
     void testReadVeryLargeRange() throws IOException {
         // Try to read a range larger than the file (but not unreasonably large)
         int largeSize = textContent.length() * 10; // 10 times the actual file size
-        ByteBuffer buffer = reader.readRange(0, largeSize);
+        ByteBuffer buffer = reader.readRange(0, largeSize).flip();
 
         assertEquals(textContent.length(), buffer.remaining());
 
@@ -247,7 +247,8 @@ public class FileRangeReaderTest {
             assertEquals(binaryContent.length, binaryReader.size());
 
             // Read full content
-            ByteBuffer fullBuffer = binaryReader.readRange(0, binaryContent.length);
+            ByteBuffer fullBuffer =
+                    binaryReader.readRange(0, binaryContent.length).flip();
             byte[] fullBytes = new byte[fullBuffer.remaining()];
             fullBuffer.get(fullBytes);
             assertArrayEquals(binaryContent, fullBytes);
@@ -255,7 +256,7 @@ public class FileRangeReaderTest {
             // Read a chunk from the middle
             int offset = 1024;
             int length = 2048;
-            ByteBuffer partialBuffer = binaryReader.readRange(offset, length);
+            ByteBuffer partialBuffer = binaryReader.readRange(offset, length).flip();
             byte[] partialBytes = new byte[partialBuffer.remaining()];
             partialBuffer.get(partialBytes);
 
@@ -285,7 +286,7 @@ public class FileRangeReaderTest {
             // Read 100KB from the middle
             int offset = 400 * 1024; // 400KB offset
             int length = 100 * 1024; // 100KB length
-            ByteBuffer buffer = largeReader.readRange(offset, length);
+            ByteBuffer buffer = largeReader.readRange(offset, length).flip();
 
             assertEquals(length, buffer.remaining());
 
@@ -310,7 +311,7 @@ public class FileRangeReaderTest {
             assertEquals(0, emptyReader.size());
 
             // Reading should return empty buffer
-            ByteBuffer buffer = emptyReader.readRange(0, 10);
+            ByteBuffer buffer = emptyReader.readRange(0, 10).flip();
             assertEquals(0, buffer.remaining());
         }
     }
@@ -501,6 +502,10 @@ public class FileRangeReaderTest {
 
             assertEquals(bytesRead1, bytesRead2);
             assertEquals(buffer1.position(), buffer2.position());
+
+            // Flip buffers to prepare for reading (NIO contract for ByteBuffer version)
+            buffer1.flip();
+            buffer2.flip();
 
             byte[] data1 = new byte[bytesRead1];
             byte[] data2 = new byte[bytesRead2];

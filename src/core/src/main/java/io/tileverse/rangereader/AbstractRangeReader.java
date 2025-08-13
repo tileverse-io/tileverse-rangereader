@@ -50,8 +50,8 @@ public abstract class AbstractRangeReader implements RangeReader {
      * Reads bytes from the source at the specified offset into the provided target buffer.
      * <p>
      * This method provides the core implementation of range reading with comprehensive
-     * parameter validation, boundary checking, and buffer preparation. It delegates
-     * the actual data reading to {@link #readRangeNoFlip(long, int, ByteBuffer)}.
+     * parameter validation, boundary checking, and buffer management following standard
+     * NIO conventions. It delegates the actual data reading to {@link #readRangeNoFlip(long, int, ByteBuffer)}.
      * <p>
      * <strong>Parameter Validation:</strong>
      * <ul>
@@ -67,12 +67,14 @@ public abstract class AbstractRangeReader implements RangeReader {
      * <li>For reads extending beyond EOF, truncates to available data</li>
      * </ul>
      * <p>
-     * <strong>Buffer Management:</strong>
-     * The target buffer is prepared for immediate consumption by the caller:
+     * <strong>Buffer Management (NIO Conventions):</strong>
+     * Following standard Java NIO conventions, this method writes data into the buffer
+     * and advances the position:
      * <ul>
-     * <li>Position is reset to its original value (unchanged)</li>
-     * <li>Limit is set to original position + bytes actually read</li>
-     * <li>Caller can immediately read data using buffer.get() methods</li>
+     * <li>Data is written starting at the buffer's current position</li>
+     * <li>Position is advanced by the number of bytes written</li>
+     * <li>Limit remains unchanged</li>
+     * <li>Caller must call {@code flip()} to prepare buffer for reading</li>
      * </ul>
      * <p>
      * <strong>Thread Safety:</strong>
@@ -104,8 +106,7 @@ public abstract class AbstractRangeReader implements RangeReader {
         }
 
         if (length == 0) {
-            // For zero-length reads, return 0 bytes read
-            target.limit(target.position());
+            // For zero-length reads, return 0 bytes read (position unchanged)
             return 0;
         }
 
@@ -119,8 +120,7 @@ public abstract class AbstractRangeReader implements RangeReader {
 
         final long fileSize = size();
         if (offset >= fileSize) {
-            // Offset is beyond EOF, return 0 bytes read
-            target.limit(target.position());
+            // Offset is beyond EOF, return 0 bytes read (position unchanged)
             return 0;
         }
 
@@ -130,18 +130,12 @@ public abstract class AbstractRangeReader implements RangeReader {
             actualLength = (int) (fileSize - offset);
         }
 
-        final int initialPosition = target.position();
-
         final long nanoTimeStart = System.nanoTime();
 
         final int readCount = readRangeNoFlip(offset, actualLength, target);
 
         logDuration(offset, length, target, remainingBefore, nanoTimeStart);
 
-        // Prepare the buffer for reading by flipping it within the read range
-        int newPosition = target.position();
-        target.position(initialPosition);
-        target.limit(newPosition);
         return readCount;
     }
 

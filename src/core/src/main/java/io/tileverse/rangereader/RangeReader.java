@@ -47,8 +47,7 @@ public interface RangeReader extends Closeable {
      *
      * @param offset The offset to read from
      * @param length The number of bytes to read
-     * @return A ByteBuffer containing the read bytes, positioned for immediate
-     *         consumption
+     * @return A ByteBuffer with its position set at the actual number of bytes read, needs flip() to be consumed
      * @throws IOException              If an I/O error occurs
      * @throws IllegalArgumentException If offset or length is negative
      */
@@ -57,7 +56,7 @@ public interface RangeReader extends Closeable {
         ByteBuffer buffer = ByteBuffer.allocate(length);
         int bytesRead = readRange(offset, length, buffer);
         assert bytesRead <= length;
-        assert bytesRead == buffer.remaining();
+        assert bytesRead == buffer.position(); // With NIO conventions: position should be advanced by bytesRead
         return buffer;
     }
 
@@ -66,10 +65,11 @@ public interface RangeReader extends Closeable {
      * buffer.
      * <p>
      * This method allows callers to reuse ByteBuffers to reduce garbage collection
-     * pressure. The target buffer will be prepared for immediate consumption with
-     * its position unchanged and limit set to position + bytes read. The caller is
-     * responsible for ensuring that the target buffer has sufficient remaining
-     * capacity for the requested length.
+     * pressure. Following standard NIO conventions, after this method returns, the
+     * target buffer's position will be advanced by the number of bytes read, and
+     * the caller must call {@code flip()} on the buffer to prepare it for reading.
+     * The caller is responsible for ensuring that the target buffer has sufficient
+     * remaining capacity for the requested length.
      *
      * @param offset The offset to read from
      * @param length The number of bytes to read

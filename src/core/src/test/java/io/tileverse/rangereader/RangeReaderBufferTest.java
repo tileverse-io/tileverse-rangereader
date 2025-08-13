@@ -94,6 +94,7 @@ public class RangeReaderBufferTest {
             // Test a full read
             ByteBuffer target = ByteBuffer.allocate(textContent.length());
             int bytesRead = reader.readRange(0, textContent.length(), target);
+            target.flip();
 
             // Verify read count
             assertEquals(textContent.length(), bytesRead, "Should have read the full content length");
@@ -106,6 +107,7 @@ public class RangeReaderBufferTest {
             int partialOffset = 10;
             int partialLength = 10;
             int partialBytesRead = reader.readRange(partialOffset, partialLength, partialTarget);
+            partialTarget.flip();
 
             // Verify read count
             assertEquals(partialLength, partialBytesRead, "Should have read the requested length");
@@ -127,6 +129,7 @@ public class RangeReaderBufferTest {
             ByteBuffer beyondEOFTarget = ByteBuffer.allocate(beyondEOFLength);
 
             int beyondEOFBytesRead = reader.readRange(beyondEOFOffset, beyondEOFLength, beyondEOFTarget);
+            beyondEOFTarget.flip();
 
             // Verify read count (should be truncated to available bytes)
             assertEquals(5, beyondEOFBytesRead, "Should have read only available bytes");
@@ -138,6 +141,7 @@ public class RangeReaderBufferTest {
             // Test a read entirely beyond EOF
             ByteBuffer pastEOFTarget = ByteBuffer.allocate(10);
             int pastEOFBytesRead = reader.readRange(textContent.length() + 10, 10, pastEOFTarget);
+            pastEOFTarget.flip();
 
             // Verify read count (should be 0)
             assertEquals(0, pastEOFBytesRead, "Should have read 0 bytes");
@@ -157,6 +161,7 @@ public class RangeReaderBufferTest {
             int length = 10;
 
             int bytesRead = reader.readRange(offset, length, largeTarget);
+            largeTarget.flip();
 
             // Verify read count
             assertEquals(length, bytesRead, "Should have read requested length");
@@ -196,14 +201,24 @@ public class RangeReaderBufferTest {
             // Verify read count
             assertEquals(length, bytesRead, "Should have read requested length");
 
-            assertEquals(initialPosition, target.position(), "Buffer position should be initial position");
+            // With NIO conventions: position advances, limit stays at capacity
+            assertEquals(
+                    initialPosition + bytesRead,
+                    target.position(),
+                    "Buffer position should be initial position + bytes read");
+            assertEquals(target.capacity(), target.limit(), "Buffer limit should remain at capacity");
+
+            // Now flip to prepare for reading
+            target.flip();
+
+            // After flip: position becomes 0, limit becomes the total data written
+            assertEquals(0, target.position(), "After flip, position should be 0");
             assertEquals(
                     initialPosition + bytesRead,
                     target.limit(),
-                    "Buffer limit should include both prefix and new data");
+                    "After flip, limit should be initial position + bytes read");
 
             // Read and verify the content (prefix + read data)
-            target.position(0);
             byte[] expectedContent =
                     (prefix + textContent.substring(offset, offset + length)).getBytes(StandardCharsets.UTF_8);
             byte[] actualContent = new byte[target.remaining()];
@@ -223,6 +238,7 @@ public class RangeReaderBufferTest {
             ByteBuffer target = ByteBuffer.allocate(length);
 
             int bytesRead = reader.readRange(offset, length, target);
+            target.flip(); // Flip to prepare for reading
 
             // Verify read count
             assertEquals(length, bytesRead, "Should have read requested length");
@@ -246,6 +262,7 @@ public class RangeReaderBufferTest {
             ByteBuffer target1 = ByteBuffer.allocate(length);
 
             int bytesRead1 = reader.readRange(offset, length, target1);
+            target1.flip();
 
             // Verify first read
             assertEquals(length, bytesRead1, "First read should return requested length");
@@ -256,6 +273,7 @@ public class RangeReaderBufferTest {
             // Second read of same range (from cache)
             ByteBuffer target2 = ByteBuffer.allocate(length);
             int bytesRead2 = reader.readRange(offset, length, target2);
+            target2.flip();
 
             // Verify second read
             assertEquals(length, bytesRead2, "Second read should return same length");
@@ -279,6 +297,7 @@ public class RangeReaderBufferTest {
             ByteBuffer target1 = ByteBuffer.allocate(length);
 
             int bytesRead1 = reader.readRange(offset, length, target1);
+            target1.flip();
 
             // Verify first read
             assertEquals(length, bytesRead1, "First read should return requested length");
@@ -289,6 +308,7 @@ public class RangeReaderBufferTest {
             // Second read of same range (from cache)
             ByteBuffer target2 = ByteBuffer.allocate(length);
             int bytesRead2 = reader.readRange(offset, length, target2);
+            target2.flip();
 
             // Verify second read
             assertEquals(length, bytesRead2, "Second read should return same length");
@@ -303,6 +323,7 @@ public class RangeReaderBufferTest {
             ByteBuffer directBuffer = ByteBuffer.allocateDirect(textContent.length());
 
             int bytesRead = reader.readRange(0, textContent.length(), directBuffer);
+            directBuffer.flip();
 
             // Verify read count
             assertEquals(textContent.length(), bytesRead, "Should have read the full content length");
@@ -331,6 +352,7 @@ public class RangeReaderBufferTest {
             int offset1 = 0;
             int length1 = 10;
             int bytesRead1 = reader.readRange(offset1, length1, target);
+            target.flip();
 
             // Verify first read
             assertEquals(length1, bytesRead1, "First read should return requested length");
@@ -348,6 +370,7 @@ public class RangeReaderBufferTest {
             int offset2 = 10;
             int length2 = 15;
             int bytesRead2 = reader.readRange(offset2, length2, target);
+            target.flip();
 
             // Verify second read
             assertEquals(length2, bytesRead2, "Second read should return requested length");
@@ -385,6 +408,7 @@ public class RangeReaderBufferTest {
             ByteBuffer target = ByteBuffer.allocate(length);
 
             int bytesRead = reader.readRange(offset, length, target);
+            target.flip();
 
             // Verify read count
             assertEquals(length, bytesRead, "Should have read requested length");
@@ -405,15 +429,24 @@ public class RangeReaderBufferTest {
             // Position buffer at index 2 to test that position is maintained
             target.position(2);
             int originalPosition = target.position();
+            int originalLimit = target.limit();
 
             int bytesRead = reader.readRange(5, 0, target);
 
             // Verify read count
             assertEquals(0, bytesRead, "Zero-length read should return 0 bytes");
 
-            // Verify buffer state is unchanged
-            assertEquals(originalPosition, target.position(), "Buffer position should be unchanged");
-            assertEquals(originalPosition, target.limit(), "Buffer limit should be changed to read zero bytes");
+            // With NIO conventions: for zero-length reads, position and limit should remain unchanged
+            assertEquals(
+                    originalPosition, target.position(), "Buffer position should be unchanged for zero-length read");
+            assertEquals(originalLimit, target.limit(), "Buffer limit should be unchanged for zero-length read");
+
+            // Now flip to see the effect
+            target.flip();
+
+            // After flip with zero bytes written: position becomes 0, limit becomes original position
+            assertEquals(0, target.position(), "After flip, position should be 0");
+            assertEquals(originalPosition, target.limit(), "After flip, limit should be original position");
         }
     }
 
@@ -434,12 +467,22 @@ public class RangeReaderBufferTest {
             // Verify read count
             assertEquals(length, bytesRead, "Should have read requested length");
 
-            // Buffer should be correctly set up for reading
-            assertEquals(initialPosition, target.position(), "position should be the initial position");
-            assertEquals(initialPosition + bytesRead, target.limit(), "limit should be initial position + read length");
+            // With NIO conventions: position should be advanced by bytes written, limit unchanged
+            assertEquals(
+                    initialPosition + bytesRead, target.position(), "Position should be initial position + bytes read");
+            assertEquals(target.capacity(), target.limit(), "Limit should remain at capacity");
+
+            // Now flip to prepare for reading
+            target.flip();
+
+            // After flip: position should be 0, limit should be the total data length
+            assertEquals(0, target.position(), "After flip, position should be 0");
+            assertEquals(
+                    initialPosition + bytesRead,
+                    target.limit(),
+                    "After flip, limit should be initial position + bytes read");
 
             // Read and verify the content
-            target.position(0);
             byte[] expectedContent =
                     (prefix + textContent.substring(offset, offset + length)).getBytes(StandardCharsets.UTF_8);
             byte[] actualContent = new byte[target.remaining()];
@@ -463,6 +506,7 @@ public class RangeReaderBufferTest {
                 ByteBuffer target = ByteBuffer.allocate(chunkSize);
 
                 int bytesRead = reader.readRange(offset, chunkSize, target);
+                target.flip();
 
                 // Verify read count
                 assertEquals(chunkSize, bytesRead, String.format("Should have read %d bytes", chunkSize));

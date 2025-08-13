@@ -86,7 +86,7 @@ public class FileRangeReaderIT extends AbstractRangeReaderIT {
             assertEquals(1024, reader.size(), "File size should match");
 
             // Read some data to verify it works correctly
-            ByteBuffer buffer = reader.readRange(0, 10);
+            ByteBuffer buffer = reader.readRange(0, 10).flip();
             assertEquals(10, buffer.remaining(), "Should read 10 bytes");
         }
     }
@@ -135,7 +135,7 @@ public class FileRangeReaderIT extends AbstractRangeReaderIT {
             // Verify all reads were successful
             for (int i = 0; i < threadCount; i++) {
                 assertTrue(success[i], "Thread " + i + " should have completed successfully");
-                assertEquals(100, buffers[i].remaining(), "Thread " + i + " should have read 100 bytes");
+                assertEquals(100, buffers[i].flip().remaining(), "Thread " + i + " should have read 100 bytes");
             }
 
             // Verify that each thread got different data (based on different offsets)

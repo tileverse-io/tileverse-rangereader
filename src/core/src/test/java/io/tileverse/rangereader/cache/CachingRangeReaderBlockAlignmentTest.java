@@ -34,9 +34,11 @@ class CachingRangeReaderBlockAlignmentTest {
     Path tempDir;
 
     private Path testFile;
+    ByteBuffer result = ByteBuffer.allocate(2000);
 
     @BeforeEach
     void setUp() throws IOException {
+        result.clear();
         testFile = tempDir.resolve("test.bin");
 
         // Create a test file with 100KB of random data
@@ -54,8 +56,8 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) {
 
             // Request 1 byte at offset 2000 (within the middle of a 4KB block)
-            ByteBuffer result = cachingReader.readRange(2000, 1);
-
+            cachingReader.readRange(2000, 1, result);
+            result.flip();
             // Should return exactly 1 byte
             assertThat(result.remaining()).isEqualTo(1);
 
@@ -78,18 +80,21 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) {
 
             // Request byte at offset 2000 (will cache block 0-4096)
-            ByteBuffer result1 = cachingReader.readRange(2000, 1);
-            assertThat(result1.remaining()).isEqualTo(1);
+            cachingReader.readRange(2000, 1, result);
+            result.flip();
+            assertThat(result.remaining()).isEqualTo(1);
             assertThat(cachingReader.getCacheEntryCount()).isEqualTo(1);
 
             // Request bytes at offset 3000 (should use same cached block)
-            ByteBuffer result2 = cachingReader.readRange(3000, 100);
-            assertThat(result2.remaining()).isEqualTo(100);
+            cachingReader.readRange(3000, 100, result.clear());
+            result.flip();
+            assertThat(result.remaining()).isEqualTo(100);
             assertThat(cachingReader.getCacheEntryCount()).isEqualTo(1); // Still only 1 block cached
 
             // Request bytes at offset 5000 (should cache a new block 4096-8192)
-            ByteBuffer result3 = cachingReader.readRange(5000, 50);
-            assertThat(result3.remaining()).isEqualTo(50);
+            cachingReader.readRange(5000, 50, result.clear());
+            result.flip();
+            assertThat(result.remaining()).isEqualTo(50);
             assertThat(cachingReader.getCacheEntryCount()).isEqualTo(2); // Now 2 blocks cached
         }
     }
@@ -104,8 +109,8 @@ class CachingRangeReaderBlockAlignmentTest {
 
             // Request data spanning multiple blocks (3500 to 5500 = 2000 bytes)
             // This spans from block 0 (3500 is in 0-4096) to block 1 (5500 is in 4096-8192)
-            ByteBuffer result = cachingReader.readRange(3500, 2000);
-
+            cachingReader.readRange(3500, 2000, result);
+            result.flip();
             // Should return exactly 2000 bytes
             assertThat(result.remaining()).isEqualTo(2000);
 
@@ -131,7 +136,8 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) {
 
             // Request 1 byte at offset 2000
-            ByteBuffer result = cachingReader.readRange(2000, 1);
+            cachingReader.readRange(2000, 1, result);
+            result.flip();
 
             // Should return exactly 1 byte
             assertThat(result.remaining()).isEqualTo(1);
@@ -152,7 +158,7 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) {
 
             // Request 1 byte - should cache 64KB block (but limited by file size)
-            reader1.readRange(1000, 1);
+            reader1.readRange(1000, 1, result);
             assertThat(reader1.getEstimatedCacheSizeBytes()).isEqualTo(65536); // Default 64KB block
         }
 
@@ -163,7 +169,7 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) {
 
             // Request 1 byte - should cache 8KB block
-            reader2.readRange(1000, 1);
+            reader2.readRange(1000, 1, result);
             assertThat(reader2.getEstimatedCacheSizeBytes()).isEqualTo(8192);
         }
 
@@ -174,7 +180,7 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) {
 
             // Request 1 byte - should cache exactly 1 byte
-            reader3.readRange(1000, 1);
+            reader3.readRange(1000, 1, result);
             assertThat(reader3.getEstimatedCacheSizeBytes()).isEqualTo(1);
         }
     }
@@ -187,8 +193,8 @@ class CachingRangeReaderBlockAlignmentTest {
                         .build()) { // No block alignment configuration
 
             // Request 1 byte at offset 2000
-            ByteBuffer result = cachingReader.readRange(2000, 1);
-
+            cachingReader.readRange(2000, 1, result);
+            result.flip();
             // Should return exactly 1 byte
             assertThat(result.remaining()).isEqualTo(1);
 
@@ -208,18 +214,21 @@ class CachingRangeReaderBlockAlignmentTest {
 
             // Request data near the end of file (spanning across the final block boundary)
             // offset 98000 is in block 5 (81920-98303), request extends into final block 6 (98304-102399)
-            ByteBuffer result1 = cachingReader.readRange(98000, 1000); // Should load 2 blocks
-            assertThat(result1.remaining()).isEqualTo(1000);
+            cachingReader.readRange(98000, 1000, result); // Should load 2 blocks
+            result.flip();
+            assertThat(result.remaining()).isEqualTo(1000);
             assertThat(cachingReader.getCacheEntryCount()).isEqualTo(2); // Block 5 + final partial block 6
 
             // Request data from the same final block - should NOT make new delegate calls
-            ByteBuffer result2 = cachingReader.readRange(99000, 1000); // Also spans the same 2 blocks
-            assertThat(result2.remaining()).isEqualTo(1000);
+            cachingReader.readRange(99000, 1000, result.clear()); // Also spans the same 2 blocks
+            result.flip();
+            assertThat(result.remaining()).isEqualTo(1000);
             assertThat(cachingReader.getCacheEntryCount()).isEqualTo(2); // Same number of cache entries
 
             // Request data only from the final partial block
-            ByteBuffer result3 = cachingReader.readRange(100000, 1000); // Only in final block
-            assertThat(result3.remaining()).isEqualTo(1000);
+            cachingReader.readRange(100000, 1000, result.clear()); // Only in final block
+            result.flip();
+            assertThat(result.remaining()).isEqualTo(1000);
             assertThat(cachingReader.getCacheEntryCount()).isEqualTo(2); // Still same cache entries
 
             // Verify the final block is correctly sized (not full 16KB)

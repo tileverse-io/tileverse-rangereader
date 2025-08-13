@@ -112,7 +112,7 @@ class RangeReaderSeekableByteChannelTest {
 
             // Act
             int bytesRead = channel.read(buffer);
-
+            buffer.flip();
             // Assert
             assertThat(bytesRead).isEqualTo(100);
             assertThat(channel.position()).isEqualTo(100L);
@@ -203,7 +203,7 @@ class RangeReaderSeekableByteChannelTest {
 
             // Verify data integrity - buffer is already positioned correctly after readRange
             byte[] readData = new byte[bytesRead];
-            buffer.get(readData);
+            buffer.flip().get(readData);
 
             byte[] expectedData = new byte[bytesRead];
             System.arraycopy(testData, (int) (TEST_FILE_SIZE - remainingBytes), expectedData, 0, bytesRead);
@@ -228,6 +228,9 @@ class RangeReaderSeekableByteChannelTest {
             assertThat(bytesRead1).isEqualTo(100);
             assertThat(bytesRead2).isEqualTo(50);
             assertThat(channel.position()).isEqualTo(150L);
+
+            buffer1.flip();
+            buffer2.flip();
 
             // Verify data integrity for both reads - buffers are already positioned correctly
             byte[] readData1 = new byte[bytesRead1];
@@ -409,7 +412,7 @@ class RangeReaderSeekableByteChannelTest {
             assertThat(channel.position()).isEqualTo(150L);
 
             byte[] data1 = new byte[bytesRead1];
-            buffer.get(data1);
+            buffer.flip().get(data1);
 
             // Seek to position 500 and read
             buffer.clear();
@@ -419,7 +422,7 @@ class RangeReaderSeekableByteChannelTest {
             assertThat(channel.position()).isEqualTo(550L);
 
             byte[] data2 = new byte[bytesRead2];
-            buffer.get(data2);
+            buffer.flip().get(data2);
 
             // Verify we read different data from different positions
             byte[] expected1 = new byte[50];
@@ -445,6 +448,7 @@ class RangeReaderSeekableByteChannelTest {
             SeekableByteChannel seekableChannel = channel;
             seekableChannel.position(50L);
             int bytesRead = seekableChannel.read(buffer);
+            buffer.flip();
 
             // Assert
             assertThat(bytesRead).isEqualTo(100);
