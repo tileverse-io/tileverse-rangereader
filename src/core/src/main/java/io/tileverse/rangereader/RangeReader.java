@@ -111,18 +111,29 @@ public interface RangeReader extends Closeable {
     String getSourceIdentifier();
 
     /**
+     * Closes this range reader and releases any underlying resource.This operation
+     * is idempotent.
+     * <p>
+     * The state of any view acquired through {@link #asByteChannel()} or
+     * {@link #asImageInputStream()} in use once this method is closed becomes
+     * undetermined.
+     */
+    @Override
+    public void close() throws IOException;
+
+    /**
      * Returns a {@link SeekableByteChannel} view of this {@code RangeReader}.
      * <p>
      * Multiple calls to this method can be performed during the life time of the {@code RangeReader}.
      * <p>
-     * The returned channel <strong>does not</strong> close the {@code RangeReader}
+     * The returned channel <strong>does not</strong> close the {@code RangeReader}. It is safe to call this method several times
+     * and from multiple threads.
      *
      * @return a SeekableByteChannel view of this RangeReader
      */
     default SeekableByteChannel asByteChannel() {
         return RangeReaderSeekableByteChannel.of(this);
     }
-
     /**
      * Returns a {@link ImageInputStream} view of this {@code RangeReader}.
      * <p>
