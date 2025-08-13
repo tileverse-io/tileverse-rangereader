@@ -125,7 +125,9 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
         // Initialize header buffer if header size > 0
         if (headerSize > 0) {
             try {
-                header = delegate.readRange(0, headerSize).asReadOnlyBuffer();
+                ByteBuffer buff = ByteBuffer.allocate(headerSize);
+                delegate.readRange(0, headerSize, buff);
+                this.header = buff.flip().asReadOnlyBuffer();
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to initialize header buffer", e);
             }
@@ -396,9 +398,12 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
                 ByteBuffer actualData = ByteBuffer.allocate(bytesRead);
                 blockData.flip();
                 actualData.put(blockData);
+                actualData.flip(); // Flip to prepare for reading
                 return actualData.asReadOnlyBuffer();
             }
 
+            // Flip the buffer to prepare it for reading by cache consumers
+            blockData.flip();
             return blockData.asReadOnlyBuffer();
         } catch (IOException e) {
             // Propagate the exception through

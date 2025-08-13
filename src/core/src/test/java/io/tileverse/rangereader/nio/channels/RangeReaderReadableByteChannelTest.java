@@ -94,7 +94,7 @@ class RangeReaderReadableByteChannelTest {
 
             // Verify data integrity - buffer is already positioned correctly after readRange
             byte[] readData = new byte[bytesRead];
-            buffer.get(readData);
+            buffer.flip().get(readData);
 
             byte[] expectedData = new byte[100];
             System.arraycopy(testData, 0, expectedData, 0, 100);
@@ -185,7 +185,7 @@ class RangeReaderReadableByteChannelTest {
 
                 // Verify data integrity for this chunk - buffer is already positioned correctly
                 byte[] chunkData = new byte[bytesRead];
-                buffer.get(chunkData);
+                buffer.flip().get(chunkData);
 
                 byte[] expectedChunk = new byte[bytesRead];
                 System.arraycopy(testData, totalBytesRead - bytesRead, expectedChunk, 0, bytesRead);
@@ -293,7 +293,7 @@ class RangeReaderReadableByteChannelTest {
 
             // Verify we read the magic header - buffer is already positioned correctly
             byte[] headerBytes = new byte[7];
-            buffer.get(headerBytes);
+            buffer.flip().get(headerBytes);
             assertThat(new String(headerBytes)).isEqualTo("TstFile");
         }
     }

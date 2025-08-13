@@ -489,9 +489,9 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
 
     private int fallbackToDelegate(final long offset, final int actualLength, ByteBuffer target) throws IOException {
         int readCount = delegate.readRange(offset, actualLength, target);
-        // readRangeNoFlip shall return the non-flipped buffer, but delegate.readRange
-        // returns it flipped
-        target.position(target.limit());
+        // With NIO conventions: delegate.readRange advances position but doesn't flip
+        // For readRangeNoFlip contract, position should be advanced by bytes written
+        // So no additional position manipulation is needed
         return readCount;
     }
 
@@ -680,6 +680,8 @@ public class DiskCachingRangeReader extends AbstractRangeReader implements Range
             // Write the data to the cache file
             try (RandomAccessFile file = new RandomAccessFile(cachePath.toFile(), "rw");
                     FileChannel channel = file.getChannel()) {
+                // Flip the buffer to prepare it for writing (position becomes 0, limit becomes data end)
+                buffer.flip();
                 channel.write(buffer);
             } catch (IOException e) {
                 // Clean up if we couldn't write

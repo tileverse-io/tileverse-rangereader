@@ -128,6 +128,7 @@ class GoogleCloudStorageRangeReaderTest {
     @Test
     void testReadEntireFile() throws IOException {
         ByteBuffer buffer = reader.readRange(0, CONTENT_LENGTH);
+        buffer.flip();
 
         assertEquals(CONTENT_LENGTH, buffer.remaining());
 
@@ -146,6 +147,7 @@ class GoogleCloudStorageRangeReaderTest {
         int length = 500;
 
         ByteBuffer buffer = reader.readRange(offset, length);
+        buffer.flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -166,6 +168,7 @@ class GoogleCloudStorageRangeReaderTest {
         int actualLength = 200; // Should be truncated to end of file
 
         ByteBuffer buffer = reader.readRange(offset, length);
+        buffer.flip();
 
         // Should only return up to the end of the file
         assertEquals(actualLength, buffer.remaining());
@@ -183,6 +186,7 @@ class GoogleCloudStorageRangeReaderTest {
     @Test
     void testReadZeroLength() throws IOException {
         ByteBuffer buffer = reader.readRange(100, 0);
+        buffer.flip();
 
         assertEquals(0, buffer.remaining());
 
@@ -228,6 +232,7 @@ class GoogleCloudStorageRangeReaderTest {
         when(readChannel.read(any(ByteBuffer.class))).thenReturn(-1);
 
         ByteBuffer buffer = reader.readRange(0, 100);
+        buffer.flip();
         assertEquals(0, buffer.remaining(), "Should return empty buffer when EOF reached immediately");
     }
 

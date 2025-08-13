@@ -107,7 +107,7 @@ class AzureBlobRangeReaderTest {
                 byte[] result = new byte[actualLength];
                 System.arraycopy(TEST_DATA, (int) offset, result, 0, actualLength);
 
-                return ByteBuffer.wrap(result);
+                return ByteBuffer.wrap(result).position(actualLength);
             }
 
             @Override
@@ -138,7 +138,7 @@ class AzureBlobRangeReaderTest {
 
     @Test
     void testReadEntireFile() throws IOException {
-        ByteBuffer buffer = reader.readRange(0, CONTENT_LENGTH);
+        ByteBuffer buffer = reader.readRange(0, CONTENT_LENGTH).flip();
 
         assertEquals(CONTENT_LENGTH, buffer.remaining());
 
@@ -153,7 +153,7 @@ class AzureBlobRangeReaderTest {
         int offset = 100;
         int length = 500;
 
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = reader.readRange(offset, length).flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -169,7 +169,7 @@ class AzureBlobRangeReaderTest {
         int offset = CONTENT_LENGTH - 200;
         int length = 500; // Beyond the end
 
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = reader.readRange(offset, length).flip();
 
         // Should only return up to the end of the file
         assertEquals(200, buffer.remaining());
@@ -183,7 +183,7 @@ class AzureBlobRangeReaderTest {
 
     @Test
     void testReadZeroLength() throws IOException {
-        ByteBuffer buffer = reader.readRange(100, 0);
+        ByteBuffer buffer = reader.readRange(100, 0).flip();
 
         assertEquals(0, buffer.remaining());
     }
@@ -200,7 +200,7 @@ class AzureBlobRangeReaderTest {
 
     @Test
     void testReadOffsetBeyondEnd() throws IOException {
-        ByteBuffer buffer = reader.readRange(CONTENT_LENGTH + 100, 10);
+        ByteBuffer buffer = reader.readRange(CONTENT_LENGTH + 100, 10).flip();
 
         // Should return empty buffer
         assertEquals(0, buffer.remaining());

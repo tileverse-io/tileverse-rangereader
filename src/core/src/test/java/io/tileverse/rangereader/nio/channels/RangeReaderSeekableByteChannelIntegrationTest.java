@@ -72,7 +72,7 @@ class RangeReaderSeekableByteChannelIntegrationTest {
 
             // Verify data integrity - buffer is already positioned correctly after readRange
             byte[] readData = new byte[bytesRead];
-            buffer.get(readData);
+            buffer.flip().get(readData);
             assertThat(readData).isEqualTo(Arrays.copyOfRange(testData, 0, bytesRead));
 
             // Seek to middle of file
@@ -87,7 +87,7 @@ class RangeReaderSeekableByteChannelIntegrationTest {
 
             // Verify data integrity from middle - buffer is already positioned correctly
             readData = new byte[bytesRead];
-            buffer.get(readData);
+            buffer.flip().get(readData);
             assertThat(readData).isEqualTo(Arrays.copyOfRange(testData, 500, 500 + bytesRead));
 
             // Seek near end and read remaining bytes
@@ -117,7 +117,7 @@ class RangeReaderSeekableByteChannelIntegrationTest {
 
             while ((bytesRead = channel.read(buffer)) != -1) {
                 // Buffer is already positioned correctly after readRange
-                buffer.get(channelData, totalBytesRead, bytesRead);
+                buffer.flip().get(channelData, totalBytesRead, bytesRead);
                 totalBytesRead += bytesRead;
                 buffer.clear();
             }
@@ -159,7 +159,7 @@ class RangeReaderSeekableByteChannelIntegrationTest {
                 // Verify data integrity - buffer is already positioned correctly
                 if (bytesRead > 0) {
                     byte[] readData = new byte[bytesRead];
-                    buffer.get(readData);
+                    buffer.flip().get(readData);
                     byte[] expectedData = Arrays.copyOfRange(testData, (int) offset, (int) offset + bytesRead);
                     assertThat(readData).isEqualTo(expectedData);
                 }

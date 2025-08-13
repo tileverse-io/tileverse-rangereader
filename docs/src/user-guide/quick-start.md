@@ -17,9 +17,11 @@ try (var reader = FileRangeReader.builder()
     
     // Read first 1024 bytes
     ByteBuffer header = reader.readRange(0, 1024);
+    header.flip(); // Prepare buffer for reading
     
     // Read a specific section
     ByteBuffer chunk = reader.readRange(50000, 8192);
+    chunk.flip(); // Prepare buffer for reading
     
     // Get total file size
     long size = reader.size();
@@ -40,6 +42,7 @@ try (var reader = HttpRangeReader.builder()
     
     // Read range from remote file
     ByteBuffer data = reader.readRange(1000, 500);
+    data.flip(); // Prepare buffer for reading
     
     System.out.println("Read " + data.remaining() + " bytes");
 }
@@ -131,6 +134,7 @@ try (var optimizedReader = CachingRangeReader.builder(
     
     // Highly optimized reads with multiple caching layers
     ByteBuffer data = optimizedReader.readRange(offset, length);
+    data.flip(); // Prepare buffer for reading
 }
 ```
 
@@ -146,8 +150,8 @@ for (long offset = 0; offset < fileSize; offset += 8192) {
     buffer.clear();  // Reset for writing
     
     int bytesRead = reader.readRange(offset, 8192, buffer);
+    buffer.flip(); // Prepare buffer for reading
     
-    // Buffer is already flipped and ready to read
     // Process buffer contents
     processData(buffer);
 }
@@ -198,6 +202,7 @@ try (var reader = FileRangeReader.builder()
     }
     
     ByteBuffer data = reader.readRange(offset, length);
+    data.flip(); // Prepare buffer for reading
     
 } catch (IOException e) {
     System.err.println("Failed to read data: " + e.getMessage());
@@ -218,9 +223,9 @@ try (var reader = FileRangeReader.builder()
     
     // Read TIFF header
     ByteBuffer header = reader.readRange(0, 16);
+    header.flip(); // Prepare buffer for reading
     
     // Check magic number
-    header.rewind();
     short magic = header.getShort();
     
     if (magic == 0x4949 || magic == 0x4D4D) {
@@ -245,6 +250,7 @@ public void processLargeFile(Path filePath, int chunkSize) throws IOException {
             int currentChunkSize = (int) Math.min(chunkSize, fileSize - processed);
             
             ByteBuffer chunk = reader.readRange(processed, currentChunkSize);
+            chunk.flip(); // Prepare buffer for reading
             
             // Process this chunk
             processChunk(chunk);

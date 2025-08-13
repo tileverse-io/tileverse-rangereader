@@ -50,8 +50,11 @@ class BlockAlignedCachingTest {
     // Use a small block size for testing
     private static final int TEST_BLOCK_SIZE = 16;
 
+    ByteBuffer buffer;
+
     @BeforeEach
     void setUp() throws IOException {
+        buffer = ByteBuffer.allocate(2 * TEST_BLOCK_SIZE);
         // Create a test file with known content
         testFile = tempDir.resolve("block-cache-test.txt");
         textContent = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -74,8 +77,8 @@ class BlockAlignedCachingTest {
     @Test
     void testCachingOfBlockAlignedReads() throws IOException {
         // Read a range that's not aligned to a block boundary
-        ByteBuffer buffer = cachingReader.readRange(10, 10);
-        assertEquals(10, buffer.remaining());
+        cachingReader.readRange(10, 10, buffer);
+        assertEquals(10, buffer.flip().remaining());
 
         byte[] bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
@@ -88,11 +91,12 @@ class BlockAlignedCachingTest {
         assertTrue(initialCount == 1 || initialCount == 2, "Expected 1 or 2 reads, but got " + initialCount);
 
         // Read the same range again - it should come from cache
-        ByteBuffer buffer2 = cachingReader.readRange(10, 10);
-        assertEquals(10, buffer2.remaining());
+        cachingReader.readRange(10, 10, buffer.clear());
+        buffer.flip();
+        assertEquals(10, buffer.remaining());
 
-        byte[] bytes2 = new byte[buffer2.remaining()];
-        buffer2.get(bytes2);
+        byte[] bytes2 = new byte[buffer.remaining()];
+        buffer.get(bytes2);
         assertEquals(textContent.substring(10, 20), new String(bytes2, StandardCharsets.UTF_8));
 
         // CountingRangeReader should not have been called again
@@ -105,30 +109,30 @@ class BlockAlignedCachingTest {
         assertEquals(0, countingReader.getReadCount());
 
         // First read: should result in BlockAlignedRangeReader accessing the underlying file
-        cachingReader.readRange(0, 5);
+        cachingReader.readRange(0, 5, buffer.clear());
         int firstReadCount = countingReader.getReadCount();
         assertTrue(firstReadCount > 0, "Expected at least one read");
 
         // Same read again: should come from cache
-        cachingReader.readRange(0, 5);
+        cachingReader.readRange(0, 5, buffer.clear());
         assertEquals(firstReadCount, countingReader.getReadCount(), "Should not have read from file again");
 
         // Different read: will hit the file again
-        cachingReader.readRange(10, 5);
+        cachingReader.readRange(10, 5, buffer.clear());
         int secondReadCount = countingReader.getReadCount();
         assertTrue(secondReadCount > firstReadCount, "Expected additional reads for new range");
 
         // Repeat the second read: should come from cache
-        cachingReader.readRange(10, 5);
+        cachingReader.readRange(10, 5, buffer.clear());
         assertEquals(secondReadCount, countingReader.getReadCount(), "Should not have read from file again");
 
         // Another new read
-        cachingReader.readRange(20, 10);
+        cachingReader.readRange(20, 10, buffer.clear());
         int thirdReadCount = countingReader.getReadCount();
         assertTrue(thirdReadCount > secondReadCount, "Expected additional reads for new range");
 
         // Repeat third read: should come from cache
-        cachingReader.readRange(20, 10);
+        cachingReader.readRange(20, 10, buffer.clear());
         assertEquals(thirdReadCount, countingReader.getReadCount(), "Should not have read from file again");
     }
 
@@ -141,12 +145,6 @@ class BlockAlignedCachingTest {
 
         public CountingRangeReader(RangeReader delegate) {
             this.delegate = delegate;
-        }
-
-        @Override
-        public ByteBuffer readRange(long offset, int length) throws IOException {
-            readCount++;
-            return delegate.readRange(offset, length);
         }
 
         @Override

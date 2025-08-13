@@ -491,7 +491,9 @@ public ByteBuffer processFile(URI dataSource, long offset, int length) throws IO
         }
         
         // Perform read and return
-        return reader.readRange(offset, length);
+        ByteBuffer result = reader.readRange(offset, length);
+        result.flip(); // Prepare buffer for reading
+        return result;
         
     } catch (IOException e) {
         logger.error("Failed to read range [{}:{}] from {}: {}", 

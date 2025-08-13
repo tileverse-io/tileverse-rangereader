@@ -93,9 +93,29 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
             final int initialPosition = target.position();
             final int blockOffset = (int) (offset - alignedOffset);
             int readCount = delegate.readRange(alignedOffset, blockSize, target);
-            int read = Math.min(readCount - blockOffset, actualLength);
-            target.position(initialPosition + read);
-            return read;
+
+            // With NIO conventions: delegate advances position by bytes written
+            // We need to adjust to only include the requested range within the block
+            if (readCount > blockOffset) {
+                int availableBytes = readCount - blockOffset;
+                int bytesToReturn = Math.min(availableBytes, actualLength);
+
+                // Move data to start at initialPosition if there's a block offset
+                if (blockOffset > 0 && readCount > blockOffset) {
+                    // Need to shift the data left to remove the unwanted prefix
+                    target.position(initialPosition + blockOffset);
+                    ByteBuffer src = target.slice().limit(bytesToReturn);
+                    target.position(initialPosition);
+                    target.put(src);
+                }
+
+                target.position(initialPosition + bytesToReturn);
+                return bytesToReturn;
+            } else {
+                // Not enough data read to cover the block offset
+                target.position(initialPosition);
+                return 0;
+            }
         }
 
         // Keep a small working buffer to read blocks
@@ -122,7 +142,10 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
 
                 // Read the block from the delegate
                 blockBuffer.clear();
-                this.readRange(blockOffset, blockSize, blockBuffer);
+                delegate.readRange(blockOffset, blockSize, blockBuffer);
+
+                // Flip buffer to prepare for reading (delegate follows NIO conventions)
+                blockBuffer.flip();
 
                 // Calculate position within the block for our data
                 int blockPosition = (int) (readStartOffset - blockOffset);

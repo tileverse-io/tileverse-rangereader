@@ -80,11 +80,11 @@ public class CachingRangeReaderTest {
 
             // First read should go to delegate
             ByteBuffer data1 = reader.readRange(1000, 500);
-            assertEquals(500, data1.remaining(), "Should read 500 bytes");
+            assertEquals(500, data1.flip().remaining(), "Should read 500 bytes");
 
             // Second read of same range should come from cache
             ByteBuffer data2 = reader.readRange(1000, 500);
-            assertEquals(500, data2.remaining(), "Should read 500 bytes from cache");
+            assertEquals(500, data2.flip().remaining(), "Should read 500 bytes from cache");
 
             // Verify data is identical
             data1.rewind();
@@ -184,7 +184,7 @@ public class CachingRangeReaderTest {
 
                                 for (int j = 0; j < numReadsPerThread; j++) {
                                     ByteBuffer data = reader.readRange(1000, 500);
-                                    assertEquals(500, data.remaining());
+                                    assertEquals(500, data.flip().remaining());
                                 }
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
@@ -215,9 +215,9 @@ public class CachingRangeReaderTest {
             ByteBuffer data2 = reader.readRange(5000, 1000);
             ByteBuffer data3 = reader.readRange(10000, 1000);
 
-            assertEquals(1000, data1.remaining());
-            assertEquals(1000, data2.remaining());
-            assertEquals(1000, data3.remaining());
+            assertEquals(1000, data1.flip().remaining());
+            assertEquals(1000, data2.flip().remaining());
+            assertEquals(1000, data3.flip().remaining());
 
             // Cache should contain all three ranges
             assertEquals(3, reader.getCacheEntryCount());
@@ -407,11 +407,11 @@ public class CachingRangeReaderTest {
 
             // Read from beginning of file - should come from header buffer
             ByteBuffer data1 = reader.readRange(0, 1000);
-            assertEquals(1000, data1.remaining());
+            assertEquals(1000, data1.flip().remaining());
 
             // Read again from header range - should still work from header buffer
             ByteBuffer data2 = reader.readRange(500, 500);
-            assertEquals(500, data2.remaining());
+            assertEquals(500, data2.flip().remaining());
 
             // Cache should be empty since reads came from header buffer
             assertEquals(0, reader.getCacheEntryCount(), "Cache should be empty with header buffer");
@@ -425,11 +425,11 @@ public class CachingRangeReaderTest {
 
             // Read within header range
             ByteBuffer headerData = reader.readRange(0, 1000);
-            assertEquals(1000, headerData.remaining());
+            assertEquals(1000, headerData.flip().remaining());
 
             // Read beyond header range - should use cache
             ByteBuffer cachedData = reader.readRange(50000, 1000);
-            assertEquals(1000, cachedData.remaining());
+            assertEquals(1000, cachedData.flip().remaining());
 
             // Cache should contain the beyond-header read
             assertEquals(1, reader.getCacheEntryCount(), "Cache should contain beyond-header read");
@@ -441,7 +441,7 @@ public class CachingRangeReaderTest {
 
             // Read from beginning - should go to cache since no header buffer
             ByteBuffer data = reader.readRange(0, 1000);
-            assertEquals(1000, data.remaining());
+            assertEquals(1000, data.flip().remaining());
 
             // Cache should contain the entry
             assertEquals(1, reader.getCacheEntryCount(), "Cache should contain entry without header buffer");

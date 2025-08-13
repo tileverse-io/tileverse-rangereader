@@ -102,8 +102,13 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
     @Override
     protected int readRangeNoFlip(long offset, int actualLength, ByteBuffer target) throws IOException {
 
-        // set limit to read at most actualLength
-        target.limit(target.position() + actualLength);
+        // Following NIO conventions: position is advanced, limit remains unchanged
+        // We need to track the initial position and limit for restoration
+        final int initialPosition = target.position();
+        final int initialLimit = target.limit();
+
+        // Temporarily set limit to prevent reading beyond the intended range
+        target.limit(initialPosition + actualLength);
 
         // Read until buffer is full or end of file
         int totalRead = 0;
@@ -120,7 +125,11 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
             totalRead += read;
             currentPosition += read;
         }
-        // Return the actual number of bytes read
+
+        // Restore original limit (NIO contract: limit remains unchanged)
+        target.limit(initialLimit);
+
+        // Position is now at initialPosition + totalRead (NIO contract: position advanced by bytes written)
         return totalRead;
     }
 

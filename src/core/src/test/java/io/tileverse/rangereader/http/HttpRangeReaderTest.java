@@ -120,7 +120,9 @@ class HttpRangeReaderTest {
                         .withHeader("Content-Length", String.valueOf(responseBytes.length))
                         .withBody(responseBytes)));
 
-        ByteBuffer buffer = reader.readRange(0, TEST_DATA.length);
+        ByteBuffer buffer = ByteBuffer.allocate(TEST_DATA.length);
+        reader.readRange(0, TEST_DATA.length, buffer);
+        buffer.flip();
 
         assertEquals(TEST_DATA.length, buffer.remaining());
 
@@ -159,7 +161,9 @@ class HttpRangeReaderTest {
                         .withHeader("Content-Length", String.valueOf(responseBytes.length))
                         .withBody(responseBytes)));
 
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        reader.readRange(offset, length, buffer);
+        buffer.flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -193,7 +197,9 @@ class HttpRangeReaderTest {
                         .withHeader("Content-Length", String.valueOf(responseBytes.length))
                         .withBody(responseBytes)));
 
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        reader.readRange(offset, length, buffer);
+        buffer.flip();
 
         assertEquals(length, buffer.remaining());
 
@@ -228,7 +234,9 @@ class HttpRangeReaderTest {
                         .withHeader("Content-Length", String.valueOf(responseBytes.length))
                         .withBody(responseBytes)));
 
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        reader.readRange(offset, length, buffer);
+        buffer.flip();
 
         // Should only get back 200 bytes (to the end of file)
         assertEquals(200, buffer.remaining());
@@ -251,7 +259,9 @@ class HttpRangeReaderTest {
         int length = 0;
 
         // The implementation now returns an empty buffer for zero-length requests without making HTTP requests
-        ByteBuffer buffer = reader.readRange(offset, length);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        reader.readRange(offset, length, buffer);
+        buffer.flip();
 
         assertEquals(0, buffer.remaining());
 
@@ -261,12 +271,12 @@ class HttpRangeReaderTest {
 
     @Test
     void testReadWithNegativeOffset() {
-        assertThrows(IllegalArgumentException.class, () -> reader.readRange(-1, 10));
+        assertThrows(IllegalArgumentException.class, () -> reader.readRange(-1, 10, ByteBuffer.allocate(1)));
     }
 
     @Test
     void testReadWithNegativeLength() {
-        assertThrows(IllegalArgumentException.class, () -> reader.readRange(0, -1));
+        assertThrows(IllegalArgumentException.class, () -> reader.readRange(0, -1, ByteBuffer.allocate(1)));
     }
 
     @Test
@@ -282,7 +292,7 @@ class HttpRangeReaderTest {
 
         // Should throw when readRange() is called (triggering range support initialization)
         HttpRangeReader reader = HttpRangeReader.of(noRangeUri);
-        assertThrows(IOException.class, () -> reader.readRange(0, 100));
+        assertThrows(IOException.class, () -> reader.readRange(0, 100, ByteBuffer.allocate(100)));
     }
 
     @Test
@@ -310,7 +320,8 @@ class HttpRangeReaderTest {
 
         // Should throw IOException when server doesn't support range requests (returns 200 instead of 206)
         try (HttpRangeReader ignoreRangeReader = HttpRangeReader.of(ignoreRangeUri)) {
-            assertThrows(IOException.class, () -> ignoreRangeReader.readRange(offset, length));
+            assertThrows(
+                    IOException.class, () -> ignoreRangeReader.readRange(offset, length, ByteBuffer.allocate(length)));
         }
     }
 
@@ -339,7 +350,7 @@ class HttpRangeReaderTest {
         // Should be able to create the reader
         try (HttpRangeReader errorReader = HttpRangeReader.of(errorUri)) {
             // But reading a range should throw
-            assertThrows(IOException.class, () -> errorReader.readRange(offset, length));
+            assertThrows(IOException.class, () -> errorReader.readRange(offset, length, ByteBuffer.allocate(length)));
 
             // Verify that range request was made
             wm.verify(
@@ -361,11 +372,6 @@ class HttpRangeReaderTest {
             // It will fail at runtime when it tries to connect, but that's expected
             new HttpRangeReader(httpsUri, false, null) {
                 // Override methods to prevent actual network requests
-                @Override
-                public ByteBuffer readRange(long offset, int length) throws IOException {
-                    return ByteBuffer.allocate(0);
-                }
-
                 @Override
                 public long size() throws IOException {
                     return 0;
@@ -422,7 +428,9 @@ class HttpRangeReaderTest {
                         startLatch.await(); // Wait for all threads to be ready
 
                         // Read a region
-                        ByteBuffer buffer = reader.readRange(regionStart, regionSize);
+                        ByteBuffer buffer = ByteBuffer.allocate(regionSize);
+                        reader.readRange(regionStart, regionSize, buffer);
+                        buffer.flip();
                         byte[] data = new byte[buffer.remaining()];
                         buffer.get(data);
 

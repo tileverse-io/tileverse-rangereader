@@ -83,7 +83,7 @@ public class RangeReaderDecoratorIT {
             int offset = DEFAULT_BLOCK_SIZE - 100; // 100 bytes before a block boundary
             int length = 200; // Crosses the boundary
 
-            ByteBuffer buffer = reader.readRange(offset, length);
+            ByteBuffer buffer = reader.readRange(offset, length).flip();
             assertEquals(length, buffer.remaining(), "Should read the requested number of bytes");
 
             // Verify the content
@@ -110,7 +110,7 @@ public class RangeReaderDecoratorIT {
             int offset = CUSTOM_BLOCK_SIZE - 100; // 100 bytes before a block boundary
             int length = 200; // Crosses the boundary
 
-            ByteBuffer buffer = reader.readRange(offset, length);
+            ByteBuffer buffer = reader.readRange(offset, length).flip();
             assertEquals(length, buffer.remaining(), "Should read the requested number of bytes");
 
             // Verify the content
@@ -134,11 +134,11 @@ public class RangeReaderDecoratorIT {
             int offset = 1000;
             int length = 100;
 
-            ByteBuffer buffer1 = reader.readRange(offset, length);
+            ByteBuffer buffer1 = reader.readRange(offset, length).flip();
             assertEquals(length, buffer1.remaining(), "Should read the requested number of bytes");
 
             // Read the same range again - should be cached
-            ByteBuffer buffer2 = reader.readRange(offset, length);
+            ByteBuffer buffer2 = reader.readRange(offset, length).flip();
             assertEquals(length, buffer2.remaining(), "Should read the requested number of bytes");
 
             // Verify the content is the same
@@ -166,14 +166,14 @@ public class RangeReaderDecoratorIT {
             int offset = CUSTOM_BLOCK_SIZE - 100;
             int length = 200;
 
-            ByteBuffer buffer1 = reader.readRange(offset, length);
+            ByteBuffer buffer1 = reader.readRange(offset, length).flip();
             assertEquals(length, buffer1.remaining(), "Should read the requested number of bytes");
 
             // Read a subset of the previously read range - should be cached
             int subsetOffset = offset + 50;
             int subsetLength = 50;
 
-            ByteBuffer buffer2 = reader.readRange(subsetOffset, subsetLength);
+            ByteBuffer buffer2 = reader.readRange(subsetOffset, subsetLength).flip();
             assertEquals(subsetLength, buffer2.remaining(), "Should read the requested number of bytes");
 
             // Verify the content
@@ -200,7 +200,7 @@ public class RangeReaderDecoratorIT {
                 int offset = i * CUSTOM_BLOCK_SIZE;
                 int length = 1000;
 
-                ByteBuffer buffer = reader.readRange(offset, length);
+                ByteBuffer buffer = reader.readRange(offset, length).flip();
                 assertEquals(length, buffer.remaining(), "Should read the requested number of bytes");
 
                 // Verify the content
@@ -217,7 +217,7 @@ public class RangeReaderDecoratorIT {
                 int offset = i * CUSTOM_BLOCK_SIZE;
                 int length = 1000;
 
-                ByteBuffer buffer = reader.readRange(offset, length);
+                ByteBuffer buffer = reader.readRange(offset, length).flip();
                 assertEquals(length, buffer.remaining(), "Should read the requested number of bytes");
 
                 // Verify the content
@@ -254,7 +254,7 @@ public class RangeReaderDecoratorIT {
 
                     if (length <= 0) continue;
 
-                    ByteBuffer buffer = reader.readRange(offset, length);
+                    ByteBuffer buffer = reader.readRange(offset, length).flip();
                     assertEquals(length, buffer.remaining(), "Should read " + length + " bytes from offset " + offset);
 
                     // Verify the content
@@ -288,7 +288,7 @@ public class RangeReaderDecoratorIT {
                 // Random length between 1 and 1000
                 int length = random.nextInt(1000) + 1;
 
-                ByteBuffer buffer = reader.readRange(offset, length);
+                ByteBuffer buffer = reader.readRange(offset, length).flip();
                 assertEquals(length, buffer.remaining(), "Should read " + length + " bytes from offset " + offset);
 
                 // Verify the content

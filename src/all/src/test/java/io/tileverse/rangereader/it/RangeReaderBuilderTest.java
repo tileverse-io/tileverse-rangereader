@@ -33,6 +33,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,6 +47,13 @@ public class RangeReaderBuilderTest {
 
     @TempDir
     Path tempDir;
+
+    private ByteBuffer data = ByteBuffer.allocate(1024);
+
+    @AfterEach
+    void clear() {
+        data.clear();
+    }
 
     /**
      * Test building a file RangeReader from a Path.
@@ -64,7 +72,8 @@ public class RangeReaderBuilderTest {
 
             // Verify it can read the file
             assertEquals(100, reader.size(), "File size should be 100 bytes");
-            ByteBuffer data = reader.readRange(0, 10);
+            reader.readRange(0, 10, data);
+            data.flip();
             assertEquals(10, data.remaining(), "Should read 10 bytes");
         }
     }
@@ -87,7 +96,8 @@ public class RangeReaderBuilderTest {
 
             // Verify it can read the file
             assertEquals(100, reader.size(), "File size should be 100 bytes");
-            ByteBuffer data = reader.readRange(0, 10);
+            reader.readRange(0, 10, data);
+            data.flip();
             assertEquals(10, data.remaining(), "Should read 10 bytes");
         }
     }
@@ -110,7 +120,8 @@ public class RangeReaderBuilderTest {
 
             // Verify it can read the file
             assertEquals(100, reader.size(), "File size should be 100 bytes");
-            ByteBuffer data = reader.readRange(0, 10);
+            reader.readRange(0, 10, data);
+            data.flip();
             assertEquals(10, data.remaining(), "Should read 10 bytes");
         }
     }
@@ -135,7 +146,8 @@ public class RangeReaderBuilderTest {
 
             // Verify it can read the file
             assertEquals(100, reader.size(), "File size should be 100 bytes");
-            ByteBuffer data = reader.readRange(0, 10);
+            reader.readRange(0, 10, data);
+            data.flip();
             assertEquals(10, data.remaining(), "Should read 10 bytes");
         }
     }
@@ -163,7 +175,8 @@ public class RangeReaderBuilderTest {
 
             // Verify it can read the file
             assertEquals(100, reader.size(), "File size should be 100 bytes");
-            ByteBuffer data = reader.readRange(0, 10);
+            reader.readRange(0, 10, data);
+            data.flip();
             assertEquals(10, data.remaining(), "Should read 10 bytes");
         }
     }
@@ -189,7 +202,8 @@ public class RangeReaderBuilderTest {
 
             // Verify it can read the file
             assertEquals(100, reader.size(), "File size should be 100 bytes");
-            ByteBuffer data = reader.readRange(0, 10);
+            reader.readRange(0, 10, data);
+            data.flip();
             assertEquals(10, data.remaining(), "Should read 10 bytes");
         }
     }

@@ -103,9 +103,11 @@ Perfect for accessing tile data without loading entire files:
 ```java
 // Read PMTiles header
 ByteBuffer header = reader.readRange(0, 127);
+header.flip();
 
 // Read specific tiles based on tile index
 ByteBuffer tileData = reader.readRange(tileOffset, tileLength);
+tileData.flip();
 ```
 
 ### Large File Processing
@@ -118,6 +120,7 @@ int chunkSize = 1024 * 1024; // 1MB chunks
 for (long offset = 0; offset < fileSize; offset += chunkSize) {
     int length = (int) Math.min(chunkSize, fileSize - offset);
     ByteBuffer chunk = reader.readRange(offset, length);
+    chunk.flip();
     // Process chunk
 }
 ```
@@ -128,10 +131,13 @@ Efficiently access cloud-stored datasets:
 ```java
 // Read dataset metadata
 ByteBuffer metadata = reader.readRange(0, 1024);
+metadata.flip();
 
 // Read specific data sections
 ByteBuffer section1 = reader.readRange(metadataSize, sectionLength);
+section1.flip();
 ByteBuffer section2 = reader.readRange(section1Offset, section1Length);
+section2.flip();
 ```
 
 ## Performance Considerations
