@@ -92,33 +92,19 @@ plugins:
 nav:
   - Home: index.md
   - User Guide:
-    - user-guide/index.md
+    - Introduction: user-guide/index.md
     - Installation: user-guide/installation.md
     - Quick Start: user-guide/quick-start.md
     - Configuration: user-guide/configuration.md
     - Authentication: user-guide/authentication.md
     - Troubleshooting: user-guide/troubleshooting.md
   - Developer Guide:
-    - developer-guide/index.md
-    - Building: developer-guide/building.md
+    - Introduction: developer-guide/index.md
     - Architecture: developer-guide/architecture.md
+    - Building: developer-guide/building.md
     - Testing: developer-guide/testing.md
     - Performance: developer-guide/performance.md
     - Contributing: developer-guide/contributing.md
-  - Technical Documentation:
-    - arc42/index.md
-    - Introduction: arc42/introduction.md
-    - Context View: arc42/context-view.md
-    - Container View: arc42/container-view.md
-    - Component View: arc42/component-view.md
-    - Runtime View: arc42/runtime-view.md
-    - Deployment View: arc42/deployment-view.md
-    - Crosscutting Concerns: arc42/crosscutting.md
-    - Quality Requirements: arc42/quality-requirements.md
-    - Architecture Decisions: arc42/decisions.md
-    - Roadmap & Future Enhancements: arc42/roadmap.md
-    - Risks & Technical Debt: arc42/risks.md
-    - Glossary: arc42/glossary.md
 
 extra:
   analytics:

@@ -1,6 +1,6 @@
 # Architecture
 
-Deep dive into the design patterns and architectural decisions of the Tileverse Range Reader library.
+This document provides a deep dive into the design patterns, architectural decisions, and technical implementation of the Tileverse Range Reader library.
 
 ## The Architectural Gap We Fill
 
@@ -33,6 +33,72 @@ ByteBuffer data = reader.readRange(offset, length);  // Same operation everywher
 
 This architectural foundation allows format libraries to focus on **parsing logic** instead of **I/O plumbing**.
 
+![System Context Diagram](../assets/images/structurizr/structurizr-SystemContext.svg)
+
+## Module Architecture
+
+The Tileverse Range Reader library follows a **modular architecture** that enables incremental adoption and minimal dependency footprint. Each module serves a specific purpose and can be used independently or in combination with others.
+
+![Container Diagram](../assets/images/structurizr/structurizr-Containers.svg)
+
+### Module Dependencies
+
+```mermaid
+graph TD
+    A[all] --> B[core]
+    A --> C[s3]
+    A --> D[azure]
+    A --> E[gcs]
+    C --> B
+    D --> B
+    E --> B
+    F[benchmarks] --> A
+```
+
+### Core Module (`tileverse-rangereader-core`)
+
+**Purpose**: Provides fundamental abstractions, base implementations, and decorators.
+
+**Key Responsibilities**:
+- Core `RangeReader` interface definition
+- Abstract base classes with common functionality
+- Local file system implementation (`FileRangeReader`)
+- HTTP/HTTPS implementation (`HttpRangeReader`)
+- Performance decorators (caching, block alignment, disk caching)
+- Authentication framework for HTTP sources
+
+### Cloud Provider Modules (`s3`, `azure`, `gcs`)
+
+**Purpose**: Provider-specific implementations for AWS, Azure, and Google Cloud.
+
+**Key Features**:
+- Native SDK integration
+- Full credential chain support
+- Provider-specific optimizations
+
+### All Module (`tileverse-rangereader-all`)
+
+**Purpose**: Convenience aggregation module that provides unified access to all functionality.
+
+## Component View
+
+![Core Module Components](../assets/images/structurizr/structurizr-CoreComponents.svg)
+
+### Component Responsibilities
+
+| Component | Responsibility | 
+|-----------|---------------|
+| **RangeReader** | Define the contract for reading byte ranges |
+| **AbstractRangeReader** | Provide common functionality and validation |
+| **FileRangeReader** | Read ranges from local files using NIO |
+| **HttpRangeReader** | Read ranges from HTTP servers with authentication |
+| **S3RangeReader** | Read ranges from Amazon S3 and S3-compatible storage |
+| **AzureBlobRangeReader** | Read ranges from Azure Blob Storage |
+| **GoogleCloudStorageRangeReader** | Read ranges from Google Cloud Storage |
+| **CachingRangeReader** | Provide in-memory caching with configurable policies |
+| **DiskCachingRangeReader** | Provide persistent disk-based caching |
+| **BlockAlignedRangeReader** | Optimize reads through block alignment |
+
 ## Core Design Patterns
 
 The library is built on proven architectural patterns that provide flexibility, performance, and maintainability.
@@ -58,30 +124,6 @@ RangeReader reader =
             .build())
         .blockSize(64 * 1024)                   // ← 64KB blocks for memory
         .build();
-```
-
-#### Benefits
-
-- **Composability**: Mix and match optimizations
-- **Single Responsibility**: Each decorator has one purpose
-- **Runtime Configuration**: Stack decorators based on use case
-- **Extensibility**: Easy to add new decorators
-
-#### Implementation Details
-
-All decorators extend `AbstractRangeReader` and implement the same interface:
-
-```java
-public class CachingRangeReader extends AbstractRangeReader {
-    private final RangeReader delegate;  // Wrapped reader
-    private final Cache<RangeKey, ByteBuffer> cache;
-    
-    @Override
-    protected int readRangeNoFlip(long offset, int actualLength, ByteBuffer target) {
-        // Check cache first, delegate on miss
-        return cachedOrDelegate(offset, actualLength, target);
-    }
-}
 ```
 
 ### Template Method Pattern
@@ -117,13 +159,6 @@ public abstract class AbstractRangeReader implements RangeReader {
 }
 ```
 
-#### Benefits
-
-- **Consistency**: All implementations behave identically
-- **Validation**: Parameter checking happens once
-- **Buffer Management**: Consistent buffer state handling
-- **Error Handling**: Centralized error management
-
 ### Builder Pattern
 
 The library uses type-safe builders for configuration:
@@ -137,466 +172,48 @@ S3RangeReader reader = S3RangeReader.builder()
     .build();
 ```
 
-#### Two Builder Approaches
+## Runtime View
 
-1. **Individual Builders** (preferred):
-   ```java
-   S3RangeReader.builder()      // Type-specific
-   HttpRangeReader.builder()    // Type-specific
-   CachingRangeReader.builder() // Type-specific
-   ```
+The runtime view describes the dynamic behavior of the library.
 
-2. **Unified Builder** (evolving):
-   ```java
-   RangeReaderBuilder.s3(uri)      // Generic
-       .withCredentials(creds)
-       .build()
-   ```
+### Basic File Range Reading
+![Basic File Read](../assets/images/structurizr/structurizr-BasicFileRead.svg)
 
-## Module Architecture
+### HTTP Range Reading with Authentication
+![HTTP Range Read](../assets/images/structurizr/structurizr-HttpRangeRead.svg)
 
-### Layered Architecture
-
-```
-┌─────────────────────────────────────┐
-│           Application Layer          │
-├─────────────────────────────────────┤
-│         Decorator Layer             │
-│  ┌─────┐ ┌─────┐ ┌──────────────┐   │
-│  │Cache│ │Disk │ │Block Aligned │   │
-│  └─────┘ └─────┘ └──────────────┘   │
-├─────────────────────────────────────┤
-│        Implementation Layer         │
-│  ┌────┐ ┌────┐ ┌──┐ ┌───┐ ┌───┐   │
-│  │File│ │HTTP│ │S3│ │Az │ │GCS│   │
-│  └────┘ └────┘ └──┘ └───┘ └───┘   │
-├─────────────────────────────────────┤
-│          Interface Layer            │
-│         RangeReader Interface       │
-└─────────────────────────────────────┘
-```
-
-### Module Dependencies
-
-```mermaid
-graph TD
-    A[all] --> B[core]
-    A --> C[s3]
-    A --> D[azure]
-    A --> E[gcs]
-    C --> B
-    D --> B
-    E --> B
-    F[benchmarks] --> A
-```
+### Multi-Level Caching Scenario
+![Multi-Level Caching](../assets/images/structurizr/structurizr-MultiLevelCaching.svg)
 
 ## Thread Safety Design
 
-### Requirements
-
-All `RangeReader` implementations MUST be thread-safe to support:
-
-- Server environments (multiple request threads)
-- Parallel processing frameworks
-- Concurrent batch operations
-
-### Implementation Strategies
-
-#### Immutable State
-
-```java
-public class FileRangeReader extends AbstractRangeReader {
-    // All fields are immutable after construction
-    private final Path filePath;
-    private final long fileSize;     // Cached at construction
-    private final String identifier; // Computed once
-    
-    // Thread-safe because state is immutable
-}
-```
-
-#### Concurrent Collections
-
-```java
-public class CachingRangeReader extends AbstractRangeReader {
-    // Caffeine cache is thread-safe
-    private final Cache<RangeKey, ByteBuffer> cache;
-    
-    @Override
-    protected int readRangeNoFlip(long offset, int length, ByteBuffer target) {
-        // Cache operations are thread-safe
-        return cache.get(key, this::loadFromDelegate);
-    }
-}
-```
-
-#### Per-Operation Resources
-
-```java
-public class HttpRangeReader extends AbstractRangeReader {
-    // Shared configuration (immutable)
-    private final URI uri;
-    private final HttpAuthentication auth;
-    
-    @Override
-    protected int readRangeNoFlip(long offset, int length, ByteBuffer target) {
-        // Create new HTTP connection per request (thread-safe)
-        try (HttpClient client = createClient()) {
-            return performRequest(client, offset, length, target);
-        }
-    }
-}
-```
+All `RangeReader` implementations MUST be thread-safe. This is achieved through:
+- **Immutable State**: Fields are final and set at construction.
+- **Concurrent Collections**: Using thread-safe caches like Caffeine.
+- **Per-Operation Resources**: Creating new resources (like HTTP connections) for each request.
 
 ## Performance Architecture
 
 ### Multi-Level Caching Strategy
 
-```
-Request → Memory Cache → Disk Cache → Base Reader → Source
-   ↓         ↓             ↓           ↓
- ~1ms      ~10ms        ~100ms     ~1000ms
-```
+`Request → Memory Cache → Disk Cache → Base Reader → Source`
 
-#### Cache Hierarchy
+- **L1 (Memory)**: Fastest access, limited capacity.
+- **L2 (Disk)**: Persistent, larger capacity.
+- **L3 (Network/Disk)**: Authoritative source.
 
-1. **L1 (Memory)**: Fastest access, limited capacity
-2. **L2 (Disk)**: Persistent, larger capacity
-3. **L3 (Network/Disk)**: Authoritative source
+### Block Alignment
 
-#### Block Alignment Benefits
-
-```java
-// Without block alignment: 3 separate requests
-reader.readRange(100, 50);   // Request 1
-reader.readRange(200, 50);   // Request 2  
-reader.readRange(300, 50);   // Request 3
-
-// With 1KB block alignment: 1 request covers all
-blockAligned.readRange(100, 50);  // Fetches block 0-1024
-blockAligned.readRange(200, 50);  // Cache hit
-blockAligned.readRange(300, 50);  // Cache hit
-```
-
-### Memory Management
-
-#### Buffer Reuse
-
-```java
-// Efficient: Reuse buffers
-ByteBuffer buffer = ByteBuffer.allocate(8192);
-for (long offset = 0; offset < size; offset += 8192) {
-    buffer.clear();
-    reader.readRange(offset, 8192, buffer);
-    // Buffer is already flipped and ready to read
-    processBuffer(buffer);
-}
-```
-
-#### Cache Sizing
-
-- **Entry-based**: Limits number of cached ranges
-- **Memory-based**: Limits total memory usage
-- **Adaptive**: Uses soft references for GC management
+Block alignment reduces the number of requests for sequential reads by fetching a larger block and serving subsequent requests from the cached block.
 
 ## Error Handling Architecture
 
-### Exception Hierarchy
-
-```
-IOException
-├── FileNotFoundException
-├── AccessDeniedException  
-├── NoSuchFileException
-└── Cloud-specific exceptions
-    ├── S3Exception
-    ├── BlobStorageException
-    └── GoogleCloudStorageException
-```
-
-### Resilience Patterns
-
-#### Graceful Degradation
-
-```java
-public class DiskCachingRangeReader extends AbstractRangeReader {
-    @Override
-    protected int readRangeNoFlip(long offset, int length, ByteBuffer target) {
-        try {
-            return readFromCache(offset, length, target);
-        } catch (NoSuchFileException cacheFileDeleted) {
-            // Graceful fallback to delegate
-            cache.invalidate(key);
-            return delegate.readRange(offset, length, target);
-        }
-    }
-}
-```
-
-#### Retry Logic
-
-```java
-public class HttpRangeReader extends AbstractRangeReader {
-    @Override
-    protected int readRangeNoFlip(long offset, int length, ByteBuffer target) {
-        for (int attempt = 0; attempt < maxRetries; attempt++) {
-            try {
-                return performRequest(offset, length, target);
-            } catch (SocketTimeoutException e) {
-                if (attempt == maxRetries - 1) throw e;
-                delay(retryDelay * (1 << attempt)); // Exponential backoff
-            }
-        }
-    }
-}
-```
+A standard `IOException` hierarchy is used, with specific exceptions for cloud providers. Resilience patterns like graceful degradation (e.g., handling a deleted cache file) and retry logic with exponential backoff are implemented.
 
 ## Extension Architecture
 
-### Adding New Data Sources
-
-1. **Extend AbstractRangeReader**:
-   ```java
-   public class MyRangeReader extends AbstractRangeReader {
-       @Override
-       protected int readRangeNoFlip(long offset, int length, ByteBuffer target) {
-           // Source-specific implementation
-       }
-   }
-   ```
-
-2. **Implement Builder Pattern**:
-   ```java
-   public static class Builder {
-       public MyRangeReader build() {
-           return new MyRangeReader(/* parameters */);
-       }
-   }
-   ```
-
-3. **Add to Factory** (optional):
-   ```java
-   public class RangeReaderFactory {
-       public static RangeReader create(URI uri) {
-           if ("myprotocol".equals(uri.getScheme())) {
-               return MyRangeReader.builder().uri(uri).build();
-           }
-           // ... other protocols
-       }
-   }
-   ```
-
-### Adding New Decorators
-
-```java
-public class CompressionRangeReader extends AbstractRangeReader {
-    private final RangeReader delegate;
-    private final CompressionAlgorithm algorithm;
-    
-    @Override
-    protected int readRangeNoFlip(long offset, int length, ByteBuffer target) {
-        // 1. Read compressed data from delegate
-        ByteBuffer compressed = readCompressed(offset, length);
-        
-        // 2. Decompress into target buffer
-        return decompress(compressed, target);
-    }
-}
-```
+New data sources can be added by extending `AbstractRangeReader` and implementing the builder pattern. New decorators can be created by implementing the `RangeReader` interface and delegating to a wrapped reader.
 
 ## Testing Architecture
 
-### Test Hierarchy
-
-```
-AbstractRangeReaderIT     ← Base integration test
-├── FileRangeReaderIT     ← File system tests
-├── HttpRangeReaderIT     ← HTTP server tests
-├── S3RangeReaderIT       ← S3 API tests
-├── AzureBlobRangeReaderIT ← Azure tests
-└── GoogleCloudStorageRangeReaderIT ← GCS tests
-```
-
-### TestContainers Integration
-
-```java
-@Testcontainers
-public class S3RangeReaderIT extends AbstractRangeReaderIT {
-    @Container
-    static LocalStackContainer localstack = new LocalStackContainer(...)
-        .withServices(LocalStackContainer.Service.S3);
-    
-    @Override
-    protected RangeReader createBaseReader() {
-        return S3RangeReader.builder()
-            .endpointOverride(localstack.getEndpoint())
-            .build();
-    }
-}
-```
-
-### Benefits
-
-- **Realistic Testing**: Real service APIs via containers
-- **Isolation**: Each test runs in clean environment  
-- **Reproducibility**: Same containers across environments
-- **CI/CD Ready**: Containers work in GitHub Actions
-
-## Performance Monitoring
-
-### Built-in Metrics
-
-```java
-// Cache statistics
-CacheStats stats = cachingReader.getCacheStats();
-double hitRate = stats.hitRate();
-long missCount = stats.missCount();
-
-// Source identification for debugging
-String sourceId = reader.getSourceIdentifier();
-// Examples:
-// "file:///path/to/file.bin"
-// "memory-cached:disk-cached:s3://bucket/key"
-```
-
-### JMH Benchmarks
-
-The `benchmarks` module provides comprehensive performance analysis:
-
-```java
-@Benchmark
-public ByteBuffer readRange() {
-    return reader.readRange(offset, length);
-}
-
-// Run with: java -jar benchmarks.jar -prof gc
-```
-
-## Security Architecture
-
-### Credential Management
-
-- **No Storage**: Credentials never stored in reader instances
-- **Provider Pattern**: Uses credential providers (AWS, Azure, GCS)
-- **Least Privilege**: Readers only need read permissions
-
-### Network Security
-
-- **TLS by Default**: HTTPS for all network communications
-- **Certificate Validation**: Proper SSL/TLS validation
-- **Proxy Support**: Corporate proxy configuration
-
-## Future Architecture Considerations
-
-### Async Support
-
-Future versions may support non-blocking I/O:
-
-```java
-// Potential future API
-CompletableFuture<ByteBuffer> readRangeAsync(long offset, int length);
-```
-
-### Streaming Support
-
-Support for reactive streams:
-
-```java
-// Potential future API  
-Publisher<ByteBuffer> streamRanges(long offset, int length, int chunkSize);
-```
-
-### Pluggable Authentication
-
-More flexible authentication system:
-
-```java
-// Potential future API
-reader.withAuthProvider(AuthProvider.oauth2(clientId, secret));
-```
-
-## Best Practices
-
-### ⚠️ CRITICAL: Decorator Ordering
-
-**BlockAlignedRangeReader must ALWAYS wrap caching decorators to prevent overlapping ranges!**
-
-```
-BlockAlignedRangeReader     ← Outermost: aligns requests (64KB)
-    ↓
-CachingRangeReader          ← Memory cache (non-overlapping 64KB blocks)
-    ↓
-BlockAlignedRangeReader     ← Aligns for disk cache (1MB)  
-    ↓
-DiskCachingRangeReader      ← Persistent storage (non-overlapping 1MB blocks)
-    ↓
-BaseReader                  ← Source-specific implementation
-```
-
-**Why this order matters:**
-
-1. **Prevents cache pollution**: Each caching layer stores non-overlapping, aligned blocks
-2. **Optimal memory usage**: No duplicate data across different alignments
-3. **Maximum cache efficiency**: Clean cache hits without range overlaps
-4. **Different block sizes**: Memory cache (64KB) vs disk cache (1MB) for optimal performance
-
-**❌ WRONG order causes problems:**
-- Overlapping ranges in cache (e.g., bytes 0-100 and bytes 64-164 both cached)
-- Wasted memory and storage
-- Poor cache hit ratios
-- Degraded performance
-
-### Resource Management
-
-**For short-term usage (preferred):**
-```java
-// Use try-with-resources for short-term access
-try (RangeReader reader = createReader()) {
-    ByteBuffer data = reader.readRange(offset, length);
-    processData(data);
-} // Automatically closed when done
-```
-
-**For long-term usage (instance variables):**
-```java
-public class DataProcessor {
-    private final RangeReader reader;
-    
-    public DataProcessor(RangeReader reader) {
-        this.reader = reader;  // Long-lived instance
-    }
-    
-    public void processChunk(long offset, int length) {
-        ByteBuffer data = reader.readRange(offset, length);
-        // Process data...
-    }
-    
-    @Override
-    public void close() throws IOException {
-        reader.close();  // ⚠️ Don't forget to close!
-    }
-}
-```
-
-**Key principle:** RangeReaders must be closed to release resources (connection pools, file handles, cache cleanup), but the timing depends on usage pattern.
-
-### Error Handling
-
-```java
-// Handle specific exceptions appropriately
-try {
-    ByteBuffer data = reader.readRange(offset, length);
-} catch (NoSuchFileException e) {
-    // File/object doesn't exist
-} catch (AccessDeniedException e) {
-    // Permission denied
-} catch (IOException e) {
-    // Other I/O error
-}
-```
-
-## Next Steps
-
-- **[Testing](testing.md)**: Understand the testing strategy
-- **[Performance](performance.md)**: Learn about optimization techniques  
-- **[Contributing](contributing.md)**: Guidelines for extending the architecture
+A base integration test class, `AbstractRangeReaderIT`, is used for all implementations. [Testcontainers](https://www.testcontainers.org/) is used to run tests against real service APIs in Docker containers.
