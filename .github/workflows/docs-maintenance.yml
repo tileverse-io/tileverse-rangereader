@@ -14,6 +14,11 @@ on:
         default: 'false'
         type: boolean
 
+# Grant permissions to create issues
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   health-check:
     runs-on: ubuntu-latest
@@ -34,7 +39,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install linkchecker markdown-link-check
+        pip install linkchecker
         
     - name: Build documentation
       working-directory: docs
@@ -131,12 +136,10 @@ jobs:
         user_guide_files=$(find user-guide -name "*.md" -type f 2>/dev/null | wc -l || echo "0")
         developer_guide_files=$(find developer-guide -name "*.md" -type f 2>/dev/null | wc -l || echo "0")
         api_files=$(find api -name "*.md" -type f 2>/dev/null | wc -l || echo "0")
-        arc42_files=$(find arc42 -name "*.md" -type f 2>/dev/null | wc -l || echo "0")
         
         echo "- **User Guide sections**: $user_guide_files" >> /tmp/doc_metrics.md
         echo "- **Developer Guide sections**: $developer_guide_files" >> /tmp/doc_metrics.md
         echo "- **API Reference sections**: $api_files" >> /tmp/doc_metrics.md
-        echo "- **arc42 Documentation sections**: $arc42_files" >> /tmp/doc_metrics.md
         
         echo "" >> /tmp/doc_metrics.md
         echo "### 📈 File Size Distribution" >> /tmp/doc_metrics.md

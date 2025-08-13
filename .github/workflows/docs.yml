@@ -134,11 +134,6 @@ jobs:
           exit 1
         fi
         
-        if [ ! -d "site/arc42" ]; then
-          echo "❌ Technical documentation directory not found"
-          exit 1
-        fi
-        
         echo "✅ Documentation site structure validated"
         
         
