@@ -184,29 +184,29 @@ public class ByteBufferPool {
      * For optimal memory alignment and performance, new buffers are created
      * with sizes that are multiples of 8KB (8192 bytes).
      *
-     * @param minCapacity minimum required capacity in bytes
-     * @return a direct ByteBuffer with at least the requested capacity
+     * @param size minimum required capacity in bytes
+     * @return a direct ByteBuffer with at least the requested capacity, and the limit set to the requested {@code size}
      * @throws IllegalArgumentException if minCapacity is negative
      */
-    public ByteBuffer borrowDirect(int minCapacity) {
-        if (minCapacity < 0) {
-            throw new IllegalArgumentException("minCapacity cannot be negative: " + minCapacity);
+    public ByteBuffer borrowDirect(int size) {
+        if (size < 0) {
+            throw new IllegalArgumentException("minCapacity cannot be negative: " + size);
         }
 
         // Try to find a suitable buffer in the pool
-        ByteBuffer buffer = findSuitableBuffer(directBuffers, minCapacity, true);
+        ByteBuffer buffer = findSuitableBuffer(directBuffers, size, true);
         if (buffer != null) {
             buffersReused.incrementAndGet();
             logger.trace("Reused direct buffer: capacity={}", buffer.capacity());
             return buffer;
+        } else {
+            // Create new direct buffer with size rounded up to multiple of 8KB
+            int alignedCapacity = roundUpTo8KB(size);
+            buffer = ByteBuffer.allocateDirect(alignedCapacity);
+            buffersCreated.incrementAndGet();
+            logger.trace("Created new direct buffer: requested={}, aligned={}", size, alignedCapacity);
         }
-
-        // Create new direct buffer with size rounded up to multiple of 8KB
-        int alignedCapacity = roundUpTo8KB(minCapacity);
-        buffer = ByteBuffer.allocateDirect(alignedCapacity);
-        buffersCreated.incrementAndGet();
-        logger.trace("Created new direct buffer: requested={}, aligned={}", minCapacity, alignedCapacity);
-        return buffer;
+        return buffer.clear().limit(size);
     }
 
     /**
@@ -216,28 +216,27 @@ public class ByteBufferPool {
      * ready for use. The buffer may have a larger capacity than requested
      * if a suitable buffer was available in the pool.
      *
-     * @param minCapacity minimum required capacity in bytes
-     * @return a heap ByteBuffer with at least the requested capacity
+     * @param size minimum required capacity in bytes
+     * @return a heap ByteBuffer with at least the requested capacity, and the limit set to the requested {@code capacity}
      * @throws IllegalArgumentException if minCapacity is negative
      */
-    public ByteBuffer borrowHeap(int minCapacity) {
-        if (minCapacity < 0) {
-            throw new IllegalArgumentException("minCapacity cannot be negative: " + minCapacity);
+    public ByteBuffer borrowHeap(int size) {
+        if (size < 0) {
+            throw new IllegalArgumentException("minCapacity cannot be negative: " + size);
         }
 
         // Try to find a suitable buffer in the pool
-        ByteBuffer buffer = findSuitableBuffer(heapBuffers, minCapacity, false);
+        ByteBuffer buffer = findSuitableBuffer(heapBuffers, size, false);
         if (buffer != null) {
             buffersReused.incrementAndGet();
             logger.trace("Reused heap buffer: capacity={}", buffer.capacity());
-            return buffer;
+        } else {
+            // Create new heap buffer
+            buffer = ByteBuffer.allocate(size);
+            buffersCreated.incrementAndGet();
+            logger.trace("Created new heap buffer: capacity={}", buffer.capacity());
         }
-
-        // Create new heap buffer
-        buffer = ByteBuffer.allocate(minCapacity);
-        buffersCreated.incrementAndGet();
-        logger.trace("Created new heap buffer: capacity={}", buffer.capacity());
-        return buffer;
+        return buffer.clear().limit(size);
     }
 
     /**

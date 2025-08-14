@@ -75,7 +75,7 @@ class ByteBufferPoolTest {
         assertThat(buffer.isDirect()).isTrue();
         assertThat(buffer.capacity()).isGreaterThanOrEqualTo(2048);
         assertThat(buffer.position()).isZero();
-        assertThat(buffer.limit()).isEqualTo(buffer.capacity());
+        assertThat(buffer.limit()).isEqualTo(2048);
     }
 
     @Test
