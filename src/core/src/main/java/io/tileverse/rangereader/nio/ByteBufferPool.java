@@ -198,7 +198,6 @@ public class ByteBufferPool {
         if (buffer != null) {
             buffersReused.incrementAndGet();
             logger.trace("Reused direct buffer: capacity={}", buffer.capacity());
-            return buffer;
         } else {
             // Create new direct buffer with size rounded up to multiple of 8KB
             int alignedCapacity = roundUpTo8KB(size);
@@ -232,8 +231,8 @@ public class ByteBufferPool {
             logger.trace("Reused heap buffer: capacity={}", buffer.capacity());
         } else {
             // Create new heap buffer
-            buffer = ByteBuffer.allocate(size);
-            buffersCreated.incrementAndGet();
+            int alignedCapacity = roundUpTo8KB(size);
+            buffer = ByteBuffer.allocate(alignedCapacity);
             logger.trace("Created new heap buffer: capacity={}", buffer.capacity());
         }
         return buffer.clear().limit(size);
