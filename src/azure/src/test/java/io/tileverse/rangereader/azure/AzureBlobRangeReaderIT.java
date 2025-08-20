@@ -56,8 +56,8 @@ public class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
 
     @Container
     @SuppressWarnings("resource")
-    static AzuriteContainer azurite = new AzuriteContainer("mcr.microsoft.com/azure-storage/azurite")
-            .withEnv("AZURITE_BLOB_LOOSE", "true")
+    static AzuriteContainer azurite = new AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:3.35.0")
+            // .withEnv("AZURITE_BLOB_LOOSE", "true")
             .withCommand("azurite-blob --skipApiVersionCheck --loose --blobHost 0.0.0.0 --debug")
             .withExposedPorts(10000, 10001, 10002);
 
@@ -135,11 +135,10 @@ public class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
         // Create StorageSharedKeyCredential
         StorageSharedKeyCredential credential = new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY);
 
-        // Create BlobClient with older API version that's compatible with Azurite
         BlobServiceClient blobServiceClient = new BlobServiceClientBuilder()
                 .endpoint(blobEndpoint)
                 .credential(credential)
-                .serviceVersion(com.azure.storage.blob.BlobServiceVersion.V2019_12_12)
+                // .serviceVersion(com.azure.storage.blob.BlobServiceVersion.V2019_12_12)
                 .buildClient();
 
         // Create RangeReader directly

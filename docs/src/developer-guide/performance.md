@@ -142,24 +142,19 @@ var reader = HttpRangeReader.builder()
 
 #### AWS S3 Client Optimization
 
+The S3 module automatically uses the Apache HttpClient, removing the need to manage Netty dependencies. You can still customize the S3 client for performance tuning:
+
 ```java
 var s3Client = S3Client.builder()
     .region(Region.US_WEST_2)
-    .overrideConfiguration(ClientOverrideConfiguration.builder()
-        .putAdvancedOption(
-            SdkAdvancedClientOption.USER_AGENT_PREFIX, "tileverse-rangereader")
-        .apiCallTimeout(Duration.ofMinutes(2))
-        .apiCallAttemptTimeout(Duration.ofSeconds(30))
-        .retryPolicy(RetryPolicy.builder()
-            .numRetries(3)
-            .build())
+    .httpClient(ApacheHttpClient.builder()
+        .maxConnections(100)
+        .socketTimeout(Duration.ofSeconds(60))
         .build())
-    .httpClientBuilder(NettyNioAsyncHttpClient.builder()
-        .maxConcurrency(100)
-        .connectionAcquisitionTimeout(Duration.ofSeconds(10))
-        .connectionTimeout(Duration.ofSeconds(10))
-        .writeTimeout(Duration.ofSeconds(30)
-        .readTimeout(Duration.ofMinutes(5)))
+    .overrideConfiguration(ClientOverrideConfiguration.builder()
+        .apiCallTimeout(Duration.ofMinutes(2))
+        .retryPolicy(RetryPolicy.builder().numRetries(3).build())
+        .build())
     .build();
 
 var reader = S3RangeReader.builder()

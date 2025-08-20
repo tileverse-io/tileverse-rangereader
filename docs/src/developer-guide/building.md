@@ -307,7 +307,7 @@ The project follows a multi-module Maven structure with BOMs for dependency mana
 # - AWS SDK components
 # - Azure Storage SDK components
 # - Google Cloud Storage SDK components
-# - Jackson, Caffeine, Netty, etc.
+# - Jackson, Caffeine, etc.
 ```
 
 #### Range Reader BOM (`bom/`)

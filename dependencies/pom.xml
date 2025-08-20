@@ -13,23 +13,37 @@
 
   <properties>
     <!-- Dependency versions -->
-    <aws-auth.version>2.31.70</aws-auth.version>
-    <aws-s3.version>2.31.70</aws-s3.version>
-    <azure-identity.version>1.15.4</azure-identity.version>
-    <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
-    <caffeine.version>3.2.1</caffeine.version>
-    <commons-codec.version>1.18.0</commons-codec.version>
-    <google-cloud-storage.version>2.53.1</google-cloud-storage.version>
+    <aws-s3.version>2.32.25</aws-s3.version>
+    <azure-identity.version>1.16.3</azure-identity.version>
+    <azure-storage-blob.version>12.31.1</azure-storage-blob.version>
+    <caffeine.version>3.2.2</caffeine.version>
+    <commons-codec.version>1.19.0</commons-codec.version>
+    <google-cloud-storage.version>2.55.0</google-cloud-storage.version>
     <httpclient.version>4.5.14</httpclient.version>
     <jackson.version>2.19.2</jackson.version>
-    <msal4j.version>1.19.1</msal4j.version>
-    <netty.version>4.1.122.Final</netty.version>
-    <slf4j-api.version>2.0.9</slf4j-api.version>
+    <msal4j.version>1.22.0</msal4j.version>
+    <slf4j-api.version>2.0.17</slf4j-api.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
       <!-- overriding versions for dependency convergence -->
+      <dependency>
+        <!--
+         Dependency convergence error for com.google.errorprone:error_prone_annotations:jar:2.40.0 paths to dependency are:
+         +-io.tileverse.rangereader:tileverse-rangereader-gcs:jar:1.0-SNAPSHOT
+           +-io.tileverse.rangereader:tileverse-rangereader-core:jar:1.0-SNAPSHOT:compile
+             +-com.github.ben-manes.caffeine:caffeine:jar:3.2.2:compile
+               +-com.google.errorprone:error_prone_annotations:jar:2.40.0:compile
+         and
+         +-io.tileverse.rangereader:tileverse-rangereader-gcs:jar:1.0-SNAPSHOT
+           +-com.google.cloud:google-cloud-storage:jar:2.53.1:compile
+             +-com.google.errorprone:error_prone_annotations:jar:2.38.0:compile        
+        -->
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>2.40.0</version>
+      </dependency>
       <dependency>
         <!--
         dependency convergence between transitive dependencies of
@@ -44,27 +58,6 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <!--
-        dependency convergence between transitive dependencies of
-        +-io.tileverse.rangereader:tileverse-rangereader-azure:jar:1.0-SNAPSHOT
-          +-com.azure:azure-storage-blob:jar:12.30.0:compile
-            +-com.azure:azure-core-http-netty:jar:1.15.11:compile
-              +-io.netty:netty-codec-http2:jar:4.1.118.Final:compile
-        and
-        +-io.tileverse.rangereader:tileverse-rangereader-azure:jar:1.0-SNAPSHOT
-          +-com.azure:azure-storage-blob:jar:12.30.0:compile
-            +-com.azure:azure-core-http-netty:jar:1.15.11:compile
-              +-io.projectreactor.netty:reactor-netty-http:jar:1.0.48:compile
-                +-io.netty:netty-codec-http2:jar:4.1.112.Final:compile
-        and several more
-        -->
-        <groupId>io.netty</groupId>
-        <artifactId>netty-bom</artifactId>
-        <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -134,17 +127,54 @@
         <artifactId>azure-storage-blob</artifactId>
         <version>${azure-storage-blob.version}</version>
         <optional>true</optional>
+        <exclusions>
+          <exclusion>
+            <!-- exclude netty, we don't want all the transitive dependencies, will use azure-core-http-jdk-httpclient instead-->
+            <groupId>com.azure</groupId>
+            <artifactId>azure-core-http-netty</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <!-- JDK HttpClient -->
+        <!-- see https://learn.microsoft.com/en-us/azure/developer/java/sdk/http-client-pipeline -->
+        <!--
+            Ensure dependency convergence on com.azure:azure-core by checking
+            https://mvnrepository.com/artifact/com.azure/azure-core-http-jdk-httpclient
+        -->
+        <groupId>com.azure</groupId>
+        <artifactId>azure-core-http-jdk-httpclient</artifactId>
+        <version>1.0.5</version>
       </dependency>
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-identity</artifactId>
         <version>${azure-identity.version}</version>
         <optional>true</optional>
+        <exclusions>
+          <exclusion>
+            <!-- exclude netty, we don't want all the transitive dependencies, will use azure-core-http-jdk-httpclient instead-->
+            <groupId>com.azure</groupId>
+            <artifactId>azure-core-http-netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- let azure-core version be managed by azure-storage-blob -> azure-core -->
+            <groupId>com.azure</groupId>
+            <artifactId>azure-core</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>msal4j</artifactId>
         <version>${msal4j.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- let azure-json version be managed by azure-storage-blob -> azure-core -> azure-json -->
+            <groupId>com.azure</groupId>
+            <artifactId>azure-json</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <!-- AWS -->
@@ -153,25 +183,65 @@
         <artifactId>s3</artifactId>
         <version>${aws-s3.version}</version>
         <optional>true</optional>
+        <exclusions>
+          <exclusion>
+            <!--
+                exclude netty, we don't want all the transitive dependencies, it'll use
+                software.amazon.awssdk:apache-client -> org.apache.httpcomponents:httpclient instead
+            -->
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>auth</artifactId>
-        <version>${aws-auth.version}</version>
+        <version>${aws-s3.version}</version>
         <optional>true</optional>
       </dependency>
       <!-- S3 specific authentication methods -->
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>sts</artifactId>
-        <version>${aws-auth.version}</version>
+        <version>${aws-s3.version}</version>
         <optional>true</optional>
+        <exclusions>
+          <exclusion>
+            <!--
+                exclude netty, we don't want all the transitive dependencies, it'll use
+                software.amazon.awssdk:apache-client -> org.apache.httpcomponents:httpclient instead
+            -->
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- let the version be managed by software.amazon.awssdk:s3 -->
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache-client</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>sso</artifactId>
-        <version>${aws-auth.version}</version>
+        <version>${aws-s3.version}</version>
         <optional>true</optional>
+        <exclusions>
+          <exclusion>
+            <!--
+                exclude netty, we don't want all the transitive dependencies, it'll use
+                software.amazon.awssdk:apache-client -> org.apache.httpcomponents:httpclient instead
+            -->
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- let the version be managed by software.amazon.awssdk:s3 -->
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache-client</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
     </dependencies>
   </dependencyManagement>
