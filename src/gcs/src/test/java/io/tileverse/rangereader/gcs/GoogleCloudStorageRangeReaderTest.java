@@ -15,10 +15,10 @@
  */
 package io.tileverse.rangereader.gcs;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -31,6 +31,7 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
+import io.tileverse.rangereader.gcs.GoogleCloudStorageRangeReader.Builder;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -248,20 +249,6 @@ class GoogleCloudStorageRangeReaderTest {
     }
 
     @Test
-    void testStorageExceptionDuringSize() throws IOException {
-        // Create a reader with content length = -1 to force size() to make a call
-        when(storage.get(BlobId.of(BUCKET, OBJECT_NAME))).thenReturn(blob);
-        when(blob.exists()).thenReturn(true);
-        when(blob.getSize()).thenReturn(-1L); // Initial construction will get -1
-
-        // Create reader successfully with -1 size
-        try (GoogleCloudStorageRangeReader failingReader =
-                new GoogleCloudStorageRangeReader(storage, BUCKET, OBJECT_NAME)) {
-            assertThrows(IOException.class, () -> failingReader.size());
-        }
-    }
-
-    @Test
     void testNullInputsInConstructor() {
         assertThrows(NullPointerException.class, () -> new GoogleCloudStorageRangeReader(null, BUCKET, OBJECT_NAME));
         assertThrows(NullPointerException.class, () -> new GoogleCloudStorageRangeReader(storage, null, OBJECT_NAME));
@@ -292,16 +279,14 @@ class GoogleCloudStorageRangeReaderTest {
         // Test builder with project ID (will use default storage)
         // This test would fail in a real environment without credentials,
         // but it tests the builder logic
-        try {
-            GoogleCloudStorageRangeReader.builder()
-                    .projectId("test-project")
-                    .bucket(BUCKET)
-                    .objectName(OBJECT_NAME)
-                    .build();
-        } catch (Exception e) {
-            // Expected in test environment - just verify we got past validation
-            assertTrue(e.getMessage().contains("GCS object") || e.getMessage().contains("credentials"));
-        }
+
+        Builder builder = GoogleCloudStorageRangeReader.builder()
+                .projectId("test-project")
+                .bucket(BUCKET)
+                .objectName(OBJECT_NAME);
+        StorageException e = assertThrows(StorageException.class, builder::build);
+        // Expected in test environment - just verify we got past validation
+        assertThat(e.getMessage()).contains("Permission 'storage.objects.get' denied on resource");
     }
 
     @Test

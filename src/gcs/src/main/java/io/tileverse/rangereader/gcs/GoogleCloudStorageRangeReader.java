@@ -41,10 +41,13 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
 
     private static final Logger LOGGER = Logger.getLogger(GoogleCloudStorageRangeReader.class.getName());
 
+    @SuppressWarnings("unused")
     private final Storage storage;
+
     private final String bucket;
     private final String objectName;
-    private long contentLength = -1;
+
+    private Blob blob;
 
     /**
      * Creates a new GoogleCloudStorageRangeReader for the specified GCS object.
@@ -58,26 +61,25 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
         this.storage = Objects.requireNonNull(storage, "Storage client cannot be null");
         this.bucket = Objects.requireNonNull(bucket, "Bucket name cannot be null");
         this.objectName = Objects.requireNonNull(objectName, "Object name cannot be null");
+        BlobId blobId = BlobId.of(bucket, objectName);
+        this.blob = storage.get(blobId);
+
+        if (blob == null || !blob.exists()) {
+            throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
+        }
     }
 
     @Override
     protected int readRangeNoFlip(final long offset, final int actualLength, ByteBuffer target) throws IOException {
         try {
-            BlobId blobId = BlobId.of(bucket, objectName);
-            Blob blob = storage.get(blobId);
-
-            if (blob == null) {
-                throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
-            }
-
             final long start = System.nanoTime();
             // Read the specified range from GCS using readChannelWithResponse
             try (ReadChannel reader = blob.reader()) {
                 reader.seek(offset);
-                byte[] data = new byte[actualLength];
+                reader.limit(offset + actualLength);
                 int totalBytesRead = 0;
                 while (totalBytesRead < actualLength) {
-                    int bytesRead = reader.read(ByteBuffer.wrap(data, totalBytesRead, actualLength - totalBytesRead));
+                    int bytesRead = reader.read(target);
                     if (bytesRead == -1) {
                         // End of file reached
                         break;
@@ -89,19 +91,7 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
                     final long millis = Duration.ofNanos(end - start).toMillis();
                     LOGGER.fine("range:[%,d +%,d], time: %,dms]".formatted(offset, actualLength, millis));
                 }
-
-                // Truncate data if we read less than expected (end of file)
-                if (totalBytesRead < actualLength) {
-                    byte[] truncatedData = new byte[totalBytesRead];
-                    System.arraycopy(data, 0, truncatedData, 0, totalBytesRead);
-                    data = truncatedData;
-                }
-
-                // Put the bytes directly into the target buffer
-                target.put(data);
-
-                // Return the number of bytes read
-                return data.length;
+                return totalBytesRead;
             }
         } catch (StorageException e) {
             throw new IOException("Failed to read range from GCS: " + e.getMessage(), e);
@@ -110,24 +100,10 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
 
     @Override
     public long size() throws IOException {
-        if (contentLength < 0) {
-            try {
-                BlobId blobId = BlobId.of(bucket, objectName);
-                Blob blob = storage.get(blobId);
-
-                if (blob == null || !blob.exists()) {
-                    throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
-                }
-
-                contentLength = blob.getSize();
-                if (contentLength < 0L) {
-                    throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
-                }
-            } catch (StorageException e) {
-                throw new IOException("Failed to get GCS object size: " + e.getMessage(), e);
-            }
+        if (blob == null || !blob.exists()) {
+            throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
         }
-        return contentLength;
+        return blob.getSize().longValue();
     }
 
     @Override

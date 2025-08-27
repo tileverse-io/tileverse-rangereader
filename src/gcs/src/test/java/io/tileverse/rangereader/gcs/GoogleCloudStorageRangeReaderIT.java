@@ -15,28 +15,21 @@
  */
 package io.tileverse.rangereader.gcs;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import io.aiven.testcontainers.fakegcsserver.FakeGcsServerContainer;
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.it.AbstractRangeReaderIT;
 import io.tileverse.rangereader.it.TestUtil;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration tests for GoogleCloudStorageRangeReader using Google Cloud Storage emulator.
@@ -45,7 +38,6 @@ import org.testcontainers.utility.DockerImageName;
  * from a GCS bucket using the Google Cloud Storage API against a local emulator container.
  */
 @Testcontainers(disabledWithoutDocker = true)
-@Disabled
 public class GoogleCloudStorageRangeReaderIT extends AbstractRangeReaderIT {
 
     private static final String BUCKET_NAME = "test-bucket";
@@ -55,12 +47,7 @@ public class GoogleCloudStorageRangeReaderIT extends AbstractRangeReaderIT {
     private static Path testFile;
     private static Storage storage;
 
-    @Container
-    @SuppressWarnings("resource")
-    static GenericContainer<?> gcsEmulator = new GenericContainer<>(
-                    DockerImageName.parse("gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators"))
-            .withCommand("gcloud", "beta", "emulators", "storage", "start", "--host=0.0.0.0", "--port=9199")
-            .withExposedPorts(9199);
+    static FakeGcsServerContainer gcsEmulator = new FakeGcsServerContainer();
 
     @BeforeAll
     static void setupGCS() throws IOException {
@@ -72,11 +59,11 @@ public class GoogleCloudStorageRangeReaderIT extends AbstractRangeReaderIT {
 
         // Configure the Storage client to use the emulator
         String emulatorHost = gcsEmulator.getHost();
-        Integer emulatorPort = gcsEmulator.getMappedPort(9199);
+        Integer emulatorPort = gcsEmulator.getFirstMappedPort();
         String emulatorEndpoint = "http://" + emulatorHost + ":" + emulatorPort;
 
         // Set the environment variable for the emulator
-        System.setProperty("STORAGE_EMULATOR_HOST", emulatorHost + ":" + emulatorPort);
+        // System.setProperty("STORAGE_EMULATOR_HOST", emulatorHost + ":" + emulatorPort);
 
         // Create Storage client
         storage = StorageOptions.newBuilder()
@@ -111,7 +98,7 @@ public class GoogleCloudStorageRangeReaderIT extends AbstractRangeReaderIT {
     protected RangeReader createBaseReader() throws IOException {
         // Create a new Storage client for each test to avoid connection issues
         String emulatorHost = gcsEmulator.getHost();
-        Integer emulatorPort = gcsEmulator.getMappedPort(9199);
+        Integer emulatorPort = gcsEmulator.getFirstMappedPort();
         String emulatorEndpoint = "http://" + emulatorHost + ":" + emulatorPort;
 
         Storage testStorage = StorageOptions.newBuilder()
@@ -121,91 +108,5 @@ public class GoogleCloudStorageRangeReaderIT extends AbstractRangeReaderIT {
                 .getService();
 
         return new GoogleCloudStorageRangeReader(testStorage, BUCKET_NAME, OBJECT_NAME);
-    }
-
-    /**
-     * Additional GCS-specific tests can go here
-     */
-    @Test
-    void testGCSSpecificFactory() throws IOException {
-        // Create GCS URI
-        URI gcsUri = URI.create("gs://" + BUCKET_NAME + "/" + OBJECT_NAME);
-
-        // Test factory method with custom Storage client
-        String emulatorHost = gcsEmulator.getHost();
-        Integer emulatorPort = gcsEmulator.getMappedPort(9199);
-        String emulatorEndpoint = "http://" + emulatorHost + ":" + emulatorPort;
-
-        Storage customStorage = StorageOptions.newBuilder()
-                .setProjectId(PROJECT_ID)
-                .setHost(emulatorEndpoint)
-                .build()
-                .getService();
-
-        try (RangeReader reader = new GoogleCloudStorageRangeReader(customStorage, BUCKET_NAME, OBJECT_NAME)) {
-            // Verify it's the right implementation
-            assertTrue(
-                    reader instanceof GoogleCloudStorageRangeReader,
-                    "Should be a GoogleCloudStorageRangeReader instance");
-
-            // Verify it can read the file
-            assertTrue(reader.size() > 0, "Should be able to read file size");
-        }
-    }
-
-    @Test
-    void testGCSFactoryWithProjectId() throws IOException {
-        // Test factory method with project ID
-        String emulatorHost = gcsEmulator.getHost();
-        Integer emulatorPort = gcsEmulator.getMappedPort(9199);
-
-        // Temporarily set the emulator environment for this test
-        String originalHost = System.getProperty("STORAGE_EMULATOR_HOST");
-        System.setProperty("STORAGE_EMULATOR_HOST", emulatorHost + ":" + emulatorPort);
-
-        Storage storage =
-                StorageOptions.newBuilder().setProjectId(PROJECT_ID).build().getService();
-
-        try (RangeReader reader = new GoogleCloudStorageRangeReader(storage, BUCKET_NAME, OBJECT_NAME)) {
-            // Verify it's the right implementation
-            assertTrue(
-                    reader instanceof GoogleCloudStorageRangeReader,
-                    "Should be a GoogleCloudStorageRangeReader instance");
-
-            // Verify it can read the file
-            assertTrue(reader.size() > 0, "Should be able to read file size");
-        } finally {
-            // Restore original system property
-            if (originalHost != null) {
-                System.setProperty("STORAGE_EMULATOR_HOST", originalHost);
-            }
-        }
-    }
-
-    @Test
-    void testGCSFactoryBasic() throws IOException {
-        // Test basic factory method
-        String emulatorHost = gcsEmulator.getHost();
-        Integer emulatorPort = gcsEmulator.getMappedPort(9199);
-
-        // Temporarily set the emulator environment for this test
-        String originalHost = System.getProperty("STORAGE_EMULATOR_HOST");
-        System.setProperty("STORAGE_EMULATOR_HOST", emulatorHost + ":" + emulatorPort);
-
-        Storage storage = StorageOptions.getDefaultInstance().getService();
-        try (RangeReader reader = new GoogleCloudStorageRangeReader(storage, BUCKET_NAME, OBJECT_NAME)) {
-            // Verify it's the right implementation
-            assertTrue(
-                    reader instanceof GoogleCloudStorageRangeReader,
-                    "Should be a GoogleCloudStorageRangeReader instance");
-
-            // Verify it can read the file
-            assertTrue(reader.size() > 0, "Should be able to read file size");
-        } finally {
-            // Restore original system property
-            if (originalHost != null) {
-                System.setProperty("STORAGE_EMULATOR_HOST", originalHost);
-            }
-        }
     }
 }

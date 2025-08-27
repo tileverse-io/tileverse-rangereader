@@ -38,6 +38,12 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>io.aiven</groupId>
+      <artifactId>testcontainers-fake-gcs-server</artifactId>
+      <version>0.2.0</version>
+    </dependency>
+
+    <dependency>
       <groupId>io.tileverse.rangereader</groupId>
       <artifactId>tileverse-rangereader-core</artifactId>
       <version>${project.version}</version>
