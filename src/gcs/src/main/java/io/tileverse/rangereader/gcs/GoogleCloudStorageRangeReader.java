@@ -15,6 +15,7 @@
  */
 package io.tileverse.rangereader.gcs;
 
+import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
@@ -25,7 +26,10 @@ import io.tileverse.rangereader.RangeReader;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A RangeReader implementation that reads from Google Cloud Storage.
@@ -34,6 +38,8 @@ import java.util.Objects;
  * Google Cloud Storage client library for Java.
  */
 public class GoogleCloudStorageRangeReader extends AbstractRangeReader implements RangeReader {
+
+    private static final Logger LOGGER = Logger.getLogger(GoogleCloudStorageRangeReader.class.getName());
 
     private final Storage storage;
     private final String bucket;
@@ -64,8 +70,9 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
                 throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
             }
 
+            final long start = System.nanoTime();
             // Read the specified range from GCS using readChannelWithResponse
-            try (var reader = blob.reader()) {
+            try (ReadChannel reader = blob.reader()) {
                 reader.seek(offset);
                 byte[] data = new byte[actualLength];
                 int totalBytesRead = 0;
@@ -76,6 +83,11 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
                         break;
                     }
                     totalBytesRead += bytesRead;
+                }
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    final long end = System.nanoTime();
+                    final long millis = Duration.ofNanos(end - start).toMillis();
+                    LOGGER.fine("range:[%,d +%,d], time: %,dms]".formatted(offset, actualLength, millis));
                 }
 
                 // Truncate data if we read less than expected (end of file)

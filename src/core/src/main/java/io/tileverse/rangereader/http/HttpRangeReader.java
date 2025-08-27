@@ -178,11 +178,18 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     private HttpResponse<Void> sendRangeRequest(final long offset, final int actualLength, ByteBuffer targetBuffer)
             throws IOException, InterruptedException {
 
+        final long start = System.nanoTime();
         final HttpRequest request = buildRangeRequest(offset, actualLength);
 
         Consumer<Optional<byte[]>> bodyConsumer = createStreamingConsumer(targetBuffer, actualLength);
         HttpResponse<Void> response =
                 httpClient.send(request, HttpResponse.BodyHandlers.ofByteArrayConsumer(bodyConsumer));
+
+        if (LOGGER.isLoggable(Level.FINE)) {
+            final long end = System.nanoTime();
+            final long millis = Duration.ofNanos(end - start).toMillis();
+            LOGGER.fine("range:[%,d +%,d], time: %,dms]".formatted(offset, actualLength, millis));
+        }
         return response;
     }
 

@@ -30,7 +30,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A RangeReader implementation that reads from an Azure Blob Storage container.
@@ -39,6 +42,7 @@ import java.util.Objects;
  * Azure Storage Blob client library for Java.
  */
 public class AzureBlobRangeReader extends AbstractRangeReader implements RangeReader {
+    private static final Logger LOGGER = Logger.getLogger(AzureBlobRangeReader.class.getName());
 
     private final BlobClient blobClient;
     private long contentLength = -1;
@@ -68,6 +72,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
     protected int readRangeNoFlip(long offset, int actualLength, ByteBuffer target) throws IOException {
 
         try {
+            final long start = System.nanoTime();
             // Download the specified range
             BlobRange range = new BlobRange(offset, (long) actualLength);
             DownloadRetryOptions options = new DownloadRetryOptions().setMaxRetryRequests(3);
@@ -82,6 +87,12 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
                     false,
                     java.time.Duration.ofSeconds(60), // Timeout
                     com.azure.core.util.Context.NONE); // Context
+
+            if (LOGGER.isLoggable(Level.FINE)) {
+                final long end = System.nanoTime();
+                final long millis = Duration.ofNanos(end - start).toMillis();
+                LOGGER.fine("range:[%,d +%,d], time: %,dms]".formatted(offset, actualLength, millis));
+            }
 
             // Verify the response is successful
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
