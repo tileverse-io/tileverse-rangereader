@@ -17,7 +17,6 @@ package io.tileverse.rangereader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -130,32 +129,9 @@ public abstract class AbstractRangeReader implements RangeReader {
             actualLength = (int) (fileSize - offset);
         }
 
-        final long nanoTimeStart = System.nanoTime();
-
         final int readCount = readRangeNoFlip(offset, actualLength, target);
 
-        logDuration(offset, length, target, remainingBefore, nanoTimeStart);
-
         return readCount;
-    }
-
-    private final void logDuration(
-            long offset, int length, ByteBuffer target, final int remainingBefore, final long nanoTimeStart) {
-        final long nanoTimeEnd = System.nanoTime();
-        final long nanos = nanoTimeEnd - nanoTimeStart;
-        long millis;
-        if (log.isDebugEnabled() && (millis = Duration.ofNanos(nanos).toMillis()) > 0) {
-            log.debug(
-                    "[thread %02d] %s.readRange(offset: %d, length: %d, buffer[cap: %d, remaining: %d]), time: %d ms %n"
-                            .formatted(
-                                    Thread.currentThread().getId(),
-                                    getClass().getSimpleName(),
-                                    offset,
-                                    length,
-                                    target.capacity(),
-                                    remainingBefore,
-                                    millis));
-        }
     }
 
     /**

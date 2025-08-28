@@ -24,11 +24,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.headRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
@@ -358,34 +357,6 @@ class HttpRangeReaderTest {
         }
     }
 
-    @SuppressWarnings("resource")
-    @Test
-    void testHttpsConnectionAcceptsAllCertificates() {
-        // This is a mock test - we can't really test HTTPS with WireMock without a lot of setup
-        // But we can verify that the constructor allows HTTPS URLs without throwing
-
-        URI httpsUri = URI.create("https://example.com/test.pmtiles");
-
-        try {
-            // This should not throw despite being an HTTPS URL
-            // We're just testing that the constructor accepts it
-            // It will fail at runtime when it tries to connect, but that's expected
-            new HttpRangeReader(httpsUri, false, null) {
-                // Override methods to prevent actual network requests
-                @Override
-                public long size() throws IOException {
-                    return 0;
-                }
-            };
-        } catch (Exception e) {
-            // We expect an IOException during the HEAD request, but only if it's not
-            // related to SSL certificate issues
-            if (e.getMessage().contains("certificate") || e.getMessage().contains("SSL")) {
-                fail("HttpRangeReader should accept all SSL certificates: " + e.getMessage());
-            }
-        }
-    }
-
     @Test
     void testConcurrentRangeRequests() throws Exception {
         int numThreads = 10;
@@ -484,9 +455,11 @@ class HttpRangeReaderTest {
 
         URI noContentLengthUri = URI.create("http://localhost:" + TEST_PORT + "/no-content-length");
 
-        try (HttpRangeReader reader = new HttpRangeReader(noContentLengthUri, false, null)) {
+        try (HttpRangeReader reader =
+                HttpRangeReader.builder(noContentLengthUri).build()) {
             // size() should throw when content length is missing
-            assertThrows(IOException.class, () -> reader.size());
+            IOException ex = assertThrows(IOException.class, () -> reader.size());
+            assertThat(ex.getMessage()).contains("Content length header missing");
         }
     }
 
@@ -500,25 +473,16 @@ class HttpRangeReaderTest {
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Accept-Ranges", "bytes")
-                        .withHeader("Content-Length", "1000")));
+                        .withHeader("Content-Length", "-1")));
 
         URI invalidContentLengthUri = URI.create("http://localhost:" + TEST_PORT + "/invalid-content-length");
 
-        // This reader will be used to verify the exception is thrown for invalid content length
-        @SuppressWarnings("resource")
-        HttpRangeReader reader = new HttpRangeReader(invalidContentLengthUri, false, null) {
-            @Override
-            public long size() throws IOException {
-                // Simulate a NumberFormatException when parsing content length
-                throw new IOException("Invalid content length header: not-a-number");
-            }
-        };
+        HttpRangeReader reader =
+                HttpRangeReader.builder(invalidContentLengthUri).build();
 
         // size() should throw for invalid content length
-        IOException exception = assertThrows(IOException.class, () -> reader.size());
-        assertTrue(
-                exception.getMessage().contains("Invalid content length header"),
-                "Exception message should mention invalid content length");
+        IOException ex = assertThrows(IOException.class, () -> reader.size());
+        assertThat(ex.getMessage()).contains("Invalid content length header");
     }
 
     @Test
@@ -541,6 +505,7 @@ class HttpRangeReaderTest {
 
         // Should throw when size() is called (triggering initialization)
         HttpRangeReader reader = HttpRangeReader.of(serverErrorUri);
-        assertThrows(IOException.class, reader::size);
+        IOException ex = assertThrows(IOException.class, reader::size);
+        assertThat(ex.getMessage()).contains("Failed to connect");
     }
 }
