@@ -338,7 +338,7 @@ class ReadableByteChannelDataInputTest {
         try (ReadableByteChannel channel = Files.newByteChannel(testFile, StandardOpenOption.READ)) {
             ReadableByteChannelDataInput dataInput = ReadableByteChannelDataInput.of(channel);
 
-            assertThat(dataInput.getChannel()).isSameAs(channel);
+            assertThat(dataInput.channel()).isSameAs(channel);
         }
     }
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.tileverse.imageio;
+package io.tileverse.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -96,7 +96,7 @@ public final class SeekableByteChannelImageInputStream extends ImageInputStreamI
     /** The underlying SeekableByteChannel that provides the data source. */
     private final SeekableByteChannel channel;
 
-    /** Reusable single-byte buffer to reduce GC pressure. */
+    /** Reusable single-byte buffer for {@link #read()} to reduce GC pressure. */
     private final ByteBuffer singleByteBuffer = ByteBuffer.allocate(1);
 
     /**
@@ -149,7 +149,7 @@ public final class SeekableByteChannelImageInputStream extends ImageInputStreamI
         }
 
         // Update streamPos to match channel position
-        streamPos = channel.position();
+        super.streamPos = channel.position();
 
         return singleByteBuffer.get(0) & 0xFF;
     }
@@ -188,7 +188,7 @@ public final class SeekableByteChannelImageInputStream extends ImageInputStreamI
         warnIfZeroBytesRead(bytesRead);
 
         // Update streamPos to match channel position (even if 0 bytes read)
-        streamPos = channel.position();
+        super.streamPos = channel.position();
 
         return bytesRead; // Return actual bytes read (could be 0)
     }
@@ -234,7 +234,7 @@ public final class SeekableByteChannelImageInputStream extends ImageInputStreamI
         channel.position(pos);
 
         // Update stream position to match channel position
-        streamPos = channel.position();
+        super.streamPos = channel.position();
     }
 
     /**
@@ -272,14 +272,7 @@ public final class SeekableByteChannelImageInputStream extends ImageInputStreamI
 
     @Override
     public String toString() {
-        try {
-            return String.format(
-                    "SeekableByteChannelImageInputStream[channel=%s, position=%d, size=%d, byteOrder=%s]",
-                    channel, streamPos, channel != null ? channel.size() : -1, byteOrder);
-        } catch (IOException e) {
-            return String.format(
-                    "SeekableByteChannelImageInputStream[channel=%s, position=%d, size=unknown, byteOrder=%s]",
-                    channel, streamPos, byteOrder);
-        }
+        return "SeekableByteChannelImageInputStream[channel=%s, position=%d, size=%d, byteOrder=%s]"
+                .formatted(channel, streamPos, length(), byteOrder);
     }
 }

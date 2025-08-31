@@ -15,9 +15,10 @@
  */
 package io.tileverse.rangereader;
 
-import io.tileverse.imageio.SeekableByteChannelImageInputStream;
-import io.tileverse.rangereader.nio.ByteBufferPool;
-import io.tileverse.rangereader.nio.channels.RangeReaderSeekableByteChannel;
+import io.tileverse.io.ByteBufferPool;
+import io.tileverse.io.ByteRange;
+import io.tileverse.io.SeekableByteChannelImageInputStream;
+import io.tileverse.rangereader.adapters.RangeReaderSeekableByteChannel;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;

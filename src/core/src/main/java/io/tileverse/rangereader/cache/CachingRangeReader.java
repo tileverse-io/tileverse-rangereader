@@ -17,8 +17,8 @@ package io.tileverse.rangereader.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.tileverse.io.ByteRange;
 import io.tileverse.rangereader.AbstractRangeReader;
-import io.tileverse.rangereader.ByteRange;
 import io.tileverse.rangereader.RangeReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -290,6 +290,7 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
      * Reads multiple blocks in parallel and assembles the result.
      */
     private int readBlocksParallel(List<BlockRequest> blockRequests, ByteBuffer target) throws IOException {
+        @SuppressWarnings("unchecked")
         CompletableFuture<ByteBuffer>[] futures = new CompletableFuture[blockRequests.size()];
 
         // Load all blocks in parallel using default ForkJoinPool

@@ -15,9 +15,9 @@
  */
 package io.tileverse.rangereader.block;
 
+import io.tileverse.io.ByteBufferPool;
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.nio.ByteBufferPool;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;

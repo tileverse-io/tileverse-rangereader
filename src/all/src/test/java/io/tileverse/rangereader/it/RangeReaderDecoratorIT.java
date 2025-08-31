@@ -20,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.RangeReaderFactory;
 import io.tileverse.rangereader.block.BlockAlignedRangeReader;
 import io.tileverse.rangereader.cache.CachingRangeReader;
 import io.tileverse.rangereader.file.FileRangeReader;
@@ -156,12 +155,12 @@ public class RangeReaderDecoratorIT {
     }
 
     @Test
-    void testCombinedBlockAlignedAndCachingReader() throws IOException {
-        // Create a combined reader using RangeReaderFactory helpers
-        RangeReader baseReader = FileRangeReader.of(testFile);
+    void testBlockAlignedAndCachingReader() throws IOException {
 
-        // First, wrap with BlockAlignedRangeReader, then with CachingRangeReader
-        try (RangeReader reader = RangeReaderFactory.createBlockAlignedCaching(baseReader, CUSTOM_BLOCK_SIZE)) {
+        try (RangeReader baseReader = FileRangeReader.of(testFile)) {
+            RangeReader reader = CachingRangeReader.builder(baseReader)
+                    .blockSize(CUSTOM_BLOCK_SIZE)
+                    .build();
             // Read a range that crosses a block boundary
             int offset = CUSTOM_BLOCK_SIZE - 100;
             int length = 200;
