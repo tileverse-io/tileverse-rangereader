@@ -16,8 +16,8 @@
 package io.tileverse.rangereader.benchmarks;
 
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.RangeReaderFactory;
 import io.tileverse.rangereader.block.BlockAlignedRangeReader;
+import io.tileverse.rangereader.cache.CachingRangeReader;
 import io.tileverse.rangereader.cache.DiskCachingRangeReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -250,7 +250,7 @@ public abstract class AbstractRangeReaderBenchmark {
     }
 
     private RangeReader caching(RangeReader baseReader) {
-        return RangeReaderFactory.createCaching(baseReader, memoryCacheSize);
+        return CachingRangeReader.builder(baseReader).blockSize(memoryBlockSize).build();
     }
 
     private BlockAlignedRangeReader blockAligned(int blockSize, RangeReader baseReader) {

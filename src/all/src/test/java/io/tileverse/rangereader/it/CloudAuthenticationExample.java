@@ -21,6 +21,7 @@ import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.identity.ManagedIdentityCredentialBuilder;
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.RangeReaderFactory;
+import io.tileverse.rangereader.azure.AzureBlobRangeReader;
 import io.tileverse.rangereader.s3.S3RangeReader;
 import java.io.IOException;
 import java.net.URI;
@@ -109,8 +110,10 @@ public class CloudAuthenticationExample {
                 .clientId("client-id")
                 .clientSecret("client-secret")
                 .build();
-        RangeReader servicePrincipalReader =
-                RangeReaderFactory.createAzureBlobRangeReader(azureUri, servicePrincipalCredential);
+        RangeReader servicePrincipalReader = AzureBlobRangeReader.builder()
+                .uri(azureUri)
+                .tokenCredential(servicePrincipalCredential)
+                .build();
 
         // 4. Storage account shared key (account key authentication)
         RangeReader sharedKeyReader = RangeReaderFactory.createAzureBlobRangeReader(

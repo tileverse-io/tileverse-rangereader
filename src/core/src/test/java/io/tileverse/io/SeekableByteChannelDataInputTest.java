@@ -217,7 +217,7 @@ class SeekableByteChannelDataInputTest {
         try (SeekableByteChannel channel = Files.newByteChannel(testFile, StandardOpenOption.READ)) {
             SeekableByteChannelDataInput dataInput = SeekableByteChannelDataInput.of(channel);
 
-            assertThat(dataInput.getChannel()).isSameAs(channel);
+            assertThat(dataInput.channel()).isSameAs(channel);
         }
     }
 

@@ -21,7 +21,7 @@ import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.RangeReaderFactory;
+import io.tileverse.rangereader.azure.AzureBlobRangeReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.openjdk.jmh.annotations.Level;
@@ -117,8 +117,11 @@ public class AzureBlobRangeReaderBenchmark extends AbstractRangeReaderBenchmark 
     protected RangeReader createBaseReader() throws IOException {
         // Get connection string from Azurite container
         String connectionString = azurite.getConnectionString();
-        // Use proper method directly from RangeReaderFactory for Azurite
-        return RangeReaderFactory.createAzureBlobRangeReader(connectionString, CONTAINER_NAME, TEST_BLOB_NAME);
+        return AzureBlobRangeReader.builder()
+                .connectionString(connectionString)
+                .containerName(CONTAINER_NAME)
+                .blobPath(TEST_BLOB_NAME)
+                .build();
     }
 
     /**

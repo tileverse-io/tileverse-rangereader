@@ -32,6 +32,7 @@ import io.tileverse.rangereader.s3.S3RangeReader;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Objects;
+import java.util.Properties;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -51,10 +52,15 @@ public class RangeReaderFactory {
         // Utility class, prevent instantiation
     }
 
+    public static RangeReader create(URI uri) throws IOException {
+        return create(uri, new Properties());
+    }
+
     /**
      * Creates a RangeReader for the given URI.
      * <p>
      * This method detects the type of URI and creates the appropriate RangeReader:
+     * - no scheme assumes file://
      * - file:// URIs create a FileRangeReader
      * - http:// or https:// URIs create an HttpRangeReader
      * - s3:// URIs create an S3RangeReader with default client settings
@@ -66,8 +72,12 @@ public class RangeReaderFactory {
      * @throws IOException If an I/O error occurs
      * @throws IllegalArgumentException If the URI scheme is not supported
      */
-    public static RangeReader create(URI uri) throws IOException {
+    public static RangeReader create(URI uri, Properties rangeReaderConfig) throws IOException {
         Objects.requireNonNull(uri, "URI cannot be null");
+
+        if (uri.getScheme() == null) {
+            uri = URI.create("file:" + uri.toString());
+        }
 
         String scheme = uri.getScheme();
         if (scheme == null) {

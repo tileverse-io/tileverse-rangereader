@@ -55,13 +55,13 @@ import java.util.Objects;
 public class ReadableByteChannelDataInput implements DataInput {
 
     /** The underlying ReadableByteChannel that provides the data source. */
-    private final ReadableByteChannel channel;
+    protected final ReadableByteChannel channel;
 
     /** Internal buffer for efficient reading of primitive types. */
     protected final ByteBuffer buffer;
 
     /** Default buffer size for internal operations. */
-    private static final int DEFAULT_BUFFER_SIZE = 8192;
+    protected static final int DEFAULT_BUFFER_SIZE = 8192;
 
     /**
      * Creates a new DataInput adapter for the given ReadableByteChannel.
@@ -69,7 +69,7 @@ public class ReadableByteChannelDataInput implements DataInput {
      * @param channel the ReadableByteChannel to wrap
      * @throws IllegalArgumentException if channel is null
      */
-    private ReadableByteChannelDataInput(ReadableByteChannel channel) {
+    protected ReadableByteChannelDataInput(ReadableByteChannel channel) {
         this(channel, DEFAULT_BUFFER_SIZE);
     }
 
@@ -80,7 +80,7 @@ public class ReadableByteChannelDataInput implements DataInput {
      * @param bufferSize the size of the internal buffer
      * @throws IllegalArgumentException if channel is null or bufferSize is non-positive
      */
-    private ReadableByteChannelDataInput(ReadableByteChannel channel, int bufferSize) {
+    protected ReadableByteChannelDataInput(ReadableByteChannel channel, int bufferSize) {
         this.channel = Objects.requireNonNull(channel, "channel cannot be null");
         if (bufferSize <= 0) {
             throw new IllegalArgumentException("bufferSize must be positive: " + bufferSize);
@@ -259,7 +259,7 @@ public class ReadableByteChannelDataInput implements DataInput {
      * Reads a modified UTF-8 string as used by DataInputStream/DataOutputStream.
      * This handles the special encoding used by Java's writeUTF/readUTF methods.
      */
-    private String readModifiedUTF8(byte[] bytearr) throws IOException {
+    protected String readModifiedUTF8(byte[] bytearr) throws IOException {
         int utflen = bytearr.length;
         char[] chararr = new char[utflen];
         int c, char2, char3;
@@ -326,7 +326,7 @@ public class ReadableByteChannelDataInput implements DataInput {
      * @return the number of bytes read, or -1 if end of stream
      * @throws IOException if an I/O error occurs
      */
-    private int read(byte[] b, int off, int len) throws IOException {
+    protected int read(byte[] b, int off, int len) throws IOException {
         if (len == 0) {
             return 0;
         }
@@ -356,7 +356,7 @@ public class ReadableByteChannelDataInput implements DataInput {
      * @throws EOFException if not enough bytes are available
      * @throws IOException if an I/O error occurs
      */
-    private void ensureAvailable(int bytes) throws IOException {
+    protected void ensureAvailable(int bytes) throws IOException {
         while (buffer.remaining() < bytes) {
             if (!fillBuffer()) {
                 throw new EOFException(
@@ -371,9 +371,13 @@ public class ReadableByteChannelDataInput implements DataInput {
      * @return true if data was read, false if end of stream
      * @throws IOException if an I/O error occurs
      */
-    private boolean fillBuffer() throws IOException {
-        // Compact buffer to make room for new data
-        buffer.compact();
+    protected boolean fillBuffer() throws IOException {
+        // If buffer has remaining data, compact it to preserve unread bytes
+        if (buffer.hasRemaining()) {
+            buffer.compact();
+        } else {
+            buffer.clear();
+        }
 
         int bytesRead = channel.read(buffer);
         buffer.flip();
@@ -384,14 +388,14 @@ public class ReadableByteChannelDataInput implements DataInput {
     /**
      * Marks the current position for potential reset (simplified implementation).
      */
-    private void mark() {
+    protected void mark() {
         buffer.mark();
     }
 
     /**
      * Resets to the marked position (simplified implementation).
      */
-    private void reset() {
+    protected void reset() {
         buffer.reset();
     }
 
@@ -400,7 +404,7 @@ public class ReadableByteChannelDataInput implements DataInput {
      *
      * @return the underlying channel
      */
-    public ReadableByteChannel getChannel() {
+    public ReadableByteChannel channel() {
         return channel;
     }
 
