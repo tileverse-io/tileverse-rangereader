@@ -15,24 +15,31 @@
  */
 package io.tileverse.rangereader.http;
 
+import static java.util.Objects.requireNonNull;
+
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Consumer;
+import java.util.OptionalLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
@@ -52,7 +59,7 @@ import lombok.NonNull;
  * <p>
  * It also supports various authentication methods through the HttpAuthentication interface.
  * <p>
- * Uses the modern Java 11+ HttpClient API for better performance and features.
+ * Uses the modern Java 11+ {@linkplain HttpClient} API for better performance and features.
  */
 public class HttpRangeReader extends AbstractRangeReader implements RangeReader {
 
@@ -61,38 +68,10 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     private final URI uri;
     private final HttpClient httpClient;
     private final HttpAuthentication authentication;
-    private volatile long contentLength = -1;
-    private volatile boolean sizeInitialized = false;
+
+    private volatile Long contentLength;
     private volatile boolean rangeInitialized = false;
     private volatile HttpResponse<Void> cachedHeadResponse = null;
-
-    /**
-     * Creates a new HttpRangeReader with authentication and control over SSL certificate validation.
-     *
-     * @param uri The URI to read from
-     * @param trustAllCertificates Whether to trust all SSL certificates
-     * @param authentication The authentication mechanism to use
-     */
-    HttpRangeReader(@NonNull URI uri, boolean trustAllCertificates, HttpAuthentication authentication) {
-        this(
-                uri,
-                trustAllCertificates
-                        ? createTrustAllHttpClient()
-                        : HttpClient.newBuilder()
-                                .connectTimeout(Duration.ofSeconds(20))
-                                .build(),
-                authentication);
-    }
-
-    /**
-     * Creates a new HttpRangeReader with a custom HTTP client.
-     *
-     * @param uri The URI to read from
-     * @param httpClient The HttpClient to use
-     */
-    HttpRangeReader(URI uri, HttpClient httpClient) {
-        this(uri, httpClient, null);
-    }
 
     /**
      * Creates a new HttpRangeReader with a custom HTTP client and authentication.
@@ -102,129 +81,80 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
      * @param authentication The authentication mechanism to use, or null for no authentication
      */
     HttpRangeReader(@NonNull URI uri, @NonNull HttpClient httpClient, HttpAuthentication authentication) {
-        this.uri = uri;
-        this.httpClient = httpClient;
-        this.authentication = authentication; // Can be null for no authentication
+        this.uri = requireNonNull(uri);
+        this.httpClient = requireNonNull(httpClient);
+        this.authentication = requireNonNull(authentication);
         // Content length and range support will be checked when size() is first called
-    }
-
-    /**
-     * Creates an HttpClient that accepts all SSL certificates.
-     *
-     * @return An HttpClient configured to trust all SSL certificates
-     * @throws IOException If there's an error setting up the SSL context
-     */
-    private static HttpClient createTrustAllHttpClient() {
-        try {
-            // Create a trust manager that accepts all certificates
-            TrustManager[] trustAllCerts = new TrustManager[] {
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() {
-                        return new X509Certificate[0];
-                    }
-
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                        // Accept all
-                    }
-
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {
-                        // Accept all
-                    }
-                }
-            };
-
-            // Create SSL context with our trust manager
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, trustAllCerts, new SecureRandom());
-
-            // Create the HTTP client with our SSL context
-            return HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(20))
-                    .sslContext(sslContext)
-                    .build();
-
-        } catch (NoSuchAlgorithmException | KeyManagementException e) {
-            LOGGER.log(Level.WARNING, "Failed to create trust-all SSL context, falling back to default", e);
-            throw new IllegalArgumentException("Failed to create SSL context for HTTPS", e);
-        }
     }
 
     @Override
     protected int readRangeNoFlip(final long offset, final int actualLength, ByteBuffer target) throws IOException {
         checkServerSupportsByteRanges();
 
-        // Track initial position to calculate bytes read
-        int initialPosition = target.position();
-
         try {
-            HttpResponse<Void> response = sendRangeRequest(offset, actualLength, target);
-
-            checkStatusCode(response);
-
-            // Calculate actual bytes read by comparing positions
-            return target.position() - initialPosition;
-
-        } catch (RuntimeException e) {
-            if (e.getMessage() != null && e.getMessage().contains("Response body larger than expected")) {
-                throw new IOException("Server returned more data than requested range length", e);
-            }
-            throw e;
+            return getRange(offset, actualLength, target);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Request was interrupted", e);
         }
     }
 
-    private HttpResponse<Void> sendRangeRequest(final long offset, final int actualLength, ByteBuffer targetBuffer)
+    private int getRange(final long offset, final int length, ByteBuffer target)
             throws IOException, InterruptedException {
 
         final long start = System.nanoTime();
-        final HttpRequest request = buildRangeRequest(offset, actualLength);
+        HttpResponse<InputStream> response = sendRangeRequest(offset, length);
 
-        Consumer<Optional<byte[]>> bodyConsumer = createStreamingConsumer(targetBuffer, actualLength);
-        HttpResponse<Void> response =
-                httpClient.send(request, HttpResponse.BodyHandlers.ofByteArrayConsumer(bodyConsumer));
+        int totalRead = 0;
+        try (InputStream in = response.body()) {
+            ReadableByteChannel channel = Channels.newChannel(in);
+            int read = 0;
+            while (totalRead < length) {
+                read = channel.read(target);
+                if (read == -1) {
+                    break;
+                }
+                totalRead += read;
+            }
+        }
 
         if (LOGGER.isLoggable(Level.FINE)) {
             final long end = System.nanoTime();
             final long millis = Duration.ofNanos(end - start).toMillis();
-            LOGGER.fine("range:[%,d +%,d], time: %,dms]".formatted(offset, actualLength, millis));
+            LOGGER.fine("range:[%,d +%,d], time: %,dms]".formatted(offset, length, millis));
         }
+        return totalRead;
+    }
+
+    private HttpResponse<InputStream> sendRangeRequest(final long offset, final int length)
+            throws IOException, InterruptedException {
+
+        final HttpRequest request = buildRangeRequest(offset, length);
+
+        HttpResponse<InputStream> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (HttpConnectTimeoutException timeout) {
+            throw rethrow(timeout);
+        }
+
+        checkStatusCode(response);
+        checkContentLength(length, response);
         return response;
     }
 
-    /**
-     * Creates a consumer for streaming HTTP response data into a ByteBuffer.
-     * The consumer handles multiple calls as data chunks arrive from the network.
-     * <p>
-     * Since the Javadocs for {@code HttpResponse.BodyHandlers.ofByteArrayConsumer()} are not very clear:
-     * <ul>
-     * <li>The consumer can be called multiple times as data chunks arrive from the network
-     * <li>Each call receives an Optional<byte[]> containing a chunk of the response data
-     * <li>An empty Optional indicates the end of the stream
-     * </ul>
-     * @param targetBuffer the buffer to write response data into
-     * @param expectedLength the expected total length of the response
-     * @return a consumer that processes streaming response chunks
-     */
-    private Consumer<Optional<byte[]>> createStreamingConsumer(ByteBuffer targetBuffer, int expectedLength) {
-        return optionalBytes -> {
-            if (optionalBytes.isPresent()) {
-                byte[] chunk = optionalBytes.get();
-                if (targetBuffer.remaining() >= chunk.length) {
-                    targetBuffer.put(chunk);
-                } else {
-                    // Buffer overflow - response is larger than expected
-                    throw new RuntimeException("Response body larger than expected range length. Expected: "
-                            + expectedLength + ", received chunk size: "
-                            + chunk.length + ", remaining buffer space: "
-                            + targetBuffer.remaining());
-                }
+    private void checkContentLength(final int length, HttpResponse<InputStream> response) {
+        OptionalLong contentLength = response.headers().firstValueAsLong("Content-Length");
+        contentLength.ifPresent(returns -> {
+            if (returns > length) {
+                throw new IllegalStateException(
+                        "Server returned more data than requested. Requested %,d bytes, returned %,d"
+                                .formatted(length, returns));
             }
-        };
+        });
     }
 
-    private void checkStatusCode(HttpResponse<Void> response) throws IOException {
+    private void checkStatusCode(HttpResponse<?> response) throws IOException {
         int statusCode = response.statusCode();
         if (statusCode == 401 || statusCode == 403) {
             throw new IOException("Authentication failed for URI: " + uri + ", status code: " + statusCode);
@@ -233,16 +163,13 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         }
     }
 
-    private HttpRequest buildRangeRequest(final long offset, final int actualLength) {
+    private HttpRequest buildRangeRequest(final long offset, final int length) {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .GET()
                 .uri(uri)
-                .header("Range", "bytes=" + offset + "-" + (offset + actualLength - 1))
-                .GET();
+                .header("Range", "bytes=" + offset + "-" + (offset + length - 1));
 
-        // Apply authentication if provided
-        if (authentication != null) {
-            requestBuilder = authentication.authenticate(httpClient, requestBuilder);
-        }
+        requestBuilder = authentication.authenticate(httpClient, requestBuilder);
 
         return requestBuilder.build();
     }
@@ -261,11 +188,10 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
 
     @Override
     public long size() throws IOException {
-        if (!sizeInitialized) {
+        if (contentLength == null) {
             synchronized (this) {
-                if (!sizeInitialized) {
+                if (contentLength == null) {
                     initializeSize();
-                    sizeInitialized = true;
                 }
             }
         }
@@ -288,9 +214,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
                                 HttpRequest.newBuilder().uri(uri).method("HEAD", HttpRequest.BodyPublishers.noBody());
 
                         // Apply authentication if provided
-                        if (authentication != null) {
-                            requestBuilder = authentication.authenticate(httpClient, requestBuilder);
-                        }
+                        requestBuilder = authentication.authenticate(httpClient, requestBuilder);
 
                         HttpRequest headRequest = requestBuilder.build();
                         HttpResponse<Void> headResponse =
@@ -306,6 +230,8 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
 
                         cachedHeadResponse = headResponse;
 
+                    } catch (HttpConnectTimeoutException timeout) {
+                        throw rethrow(timeout);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         throw new IOException("Request was interrupted", e);
@@ -316,21 +242,33 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         return cachedHeadResponse;
     }
 
+    private IOException rethrow(HttpConnectTimeoutException timeout) {
+        String duration = httpClient
+                .connectTimeout()
+                .map(d -> d.toMillis() + " milliseconds")
+                .orElse("default timeout");
+
+        String message = "Connection timeout after " + duration + " to " + uri;
+        IOException ex = new IOException(message);
+        ex.addSuppressed(timeout);
+        return ex;
+    }
+
     /**
      * Initializes the content length from the cached HEAD response.
      *
      * @throws IOException If an I/O error occurs or the content length is invalid
      */
     private void initializeSize() throws IOException {
+
         HttpResponse<Void> headResponse = getHeadResponse();
 
         // Get content length
-        Optional<String> contentLengthHeader = headResponse.headers().firstValue("Content-Length");
+        OptionalLong contentLengthHeader = headResponse.headers().firstValueAsLong("Content-Length");
         if (contentLengthHeader.isPresent()) {
-            try {
-                this.contentLength = Long.parseLong(contentLengthHeader.get());
-            } catch (NumberFormatException e) {
-                throw new IOException("Invalid content length header: " + contentLengthHeader.get());
+            this.contentLength = contentLengthHeader.getAsLong();
+            if (this.contentLength < 0) {
+                throw new IOException("Invalid content length header: " + contentLength);
             }
         } else {
             throw new IOException("Content length header missing");
@@ -346,13 +284,10 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         HttpResponse<Void> headResponse = getHeadResponse();
 
         // Check for explicit range support denial
-        Optional<String> acceptRanges = headResponse.headers().firstValue("Accept-Ranges");
-        if (acceptRanges.isPresent() && acceptRanges.get().equals("none")) {
+        List<String> acceptRanges = headResponse.headers().allValues("Accept-Ranges");
+        if (acceptRanges.stream().map(String::toLowerCase).noneMatch("bytes"::equals)) {
             throw new IOException("Server explicitly does not support range requests (Accept-Ranges: none)");
         }
-
-        // If Accept-Ranges: bytes is present, range requests are supported
-        // If Accept-Ranges header is absent, we'll assume range support and let readRangeNoFlip() handle any errors
     }
 
     @Override
@@ -362,7 +297,23 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
 
     @Override
     public void close() {
-        // HttpClient is self-managed, no explicit close needed
+        // HttpClient implements AutoCloseable starting with Java 21, but it also gets
+        // shutdown() and shutdownNow(), the later being the one we want to immediately
+        // discard ongoing requests
+        if (httpClient instanceof AutoCloseable closeable) {
+            try {
+                Method shutDownNow = httpClient.getClass().getMethod("shutdownNow");
+                shutDownNow.invoke(httpClient);
+                return;
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Error shutting down HttpClient for " + uri, e);
+            }
+            try { // may something had gone wrong, just try close()
+                closeable.close();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Error closing HttpClient for " + uri, e);
+            }
+        }
     }
 
     /**
@@ -461,11 +412,16 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
      * Builder for HttpRangeReader.
      */
     public static class Builder {
+
+        public static final Duration DEFAULT_CONNECTION_TIMEOUT = Duration.ofSeconds(5);
+
         private URI uri;
         private boolean trustAllCertificates = false;
-        private io.tileverse.rangereader.http.HttpAuthentication authentication;
+        private HttpAuthentication authentication = HttpAuthentication.NONE;
+        public Duration connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
+        private HttpClient suppliedHttpClient;
 
-        private Builder() {}
+        Builder() {}
 
         public Builder(URI uri) {
             this.uri = uri;
@@ -484,6 +440,11 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
                 throw new IllegalArgumentException("URI must have http or https scheme: " + uri);
             }
             this.uri = uri;
+            return this;
+        }
+
+        public Builder connectionTimeout(Duration connectionTimeout) {
+            this.connectionTimeout = connectionTimeout;
             return this;
         }
 
@@ -558,6 +519,16 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         }
 
         /**
+         * Alternative to provide a pre-configured {@link HttpClient}.
+         * @param client
+         * @return this
+         */
+        public Builder httpClient(HttpClient client) {
+            this.suppliedHttpClient = client;
+            return this;
+        }
+
+        /**
          * Builds the HttpRangeReader.
          *
          * @return a new HttpRangeReader instance
@@ -567,7 +538,67 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
                 throw new IllegalStateException("URI must be set");
             }
 
-            return new HttpRangeReader(uri, trustAllCertificates, authentication);
+            HttpClient httpClient = this.suppliedHttpClient;
+            if (httpClient == null) {
+                httpClient = buildClient();
+            }
+
+            return new HttpRangeReader(uri, httpClient, authentication);
+        }
+
+        private HttpClient buildClient() {
+            SSLContext sslContext = createSSLContext();
+
+            HttpClient.Builder httpClientBuilder = HttpClient.newBuilder().sslContext(sslContext);
+            if (connectionTimeout == null) {
+                LOGGER.log(Level.WARNING, "c");
+            } else {
+                httpClientBuilder.connectTimeout(connectionTimeout);
+            }
+
+            return httpClientBuilder.build();
+        }
+
+        private SSLContext createSSLContext() {
+            if (trustAllCertificates) {
+                try {
+                    return createTrustAllCertificatesContext();
+                } catch (NoSuchAlgorithmException | KeyManagementException e) {
+                    LOGGER.log(Level.WARNING, "Failed to create trust-all SSL context, falling back to default", e);
+                }
+            }
+            try {
+                return SSLContext.getDefault();
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        private SSLContext createTrustAllCertificatesContext() throws NoSuchAlgorithmException, KeyManagementException {
+            // Create a trust manager that accepts all certificates
+            TrustManager[] trustAllCerts = new TrustManager[] {
+                new X509TrustManager() {
+                    @Override
+                    public X509Certificate[] getAcceptedIssuers() {
+                        return new X509Certificate[0];
+                    }
+
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        // Accept all
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        // Accept all
+                    }
+                }
+            };
+
+            // Create SSL context with our trust manager
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAllCerts, new SecureRandom());
+            return sslContext;
         }
     }
 }

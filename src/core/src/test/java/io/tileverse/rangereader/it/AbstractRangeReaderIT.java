@@ -261,6 +261,13 @@ public abstract class AbstractRangeReaderIT {
 
             assertEquals(0, zeroBytesRead, "Reading zero bytes should return 0 bytes read");
             assertEquals(0, explicitZeroBuffer.position(), "Position should remain unchanged");
+
+            // Test with one byte remaining and request more than remaining
+            ByteBuffer explicitOneBuffer = ByteBuffer.allocate(100);
+            int oneBytesRead = reader.readRange(TEST_FILE_SIZE - 1, 100, explicitOneBuffer);
+
+            assertEquals(1, oneBytesRead);
+            assertEquals(1, explicitOneBuffer.position());
         }
     }
 

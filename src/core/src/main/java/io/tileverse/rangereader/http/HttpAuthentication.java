@@ -16,7 +16,7 @@
 package io.tileverse.rangereader.http;
 
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest.Builder;
+import java.net.http.HttpRequest;
 
 /**
  * Interface for HTTP authentication strategies used by HttpRangeReader.
@@ -25,6 +25,7 @@ import java.net.http.HttpRequest.Builder;
  * by adding appropriate headers or other authentication mechanisms to the
  * request builder.
  */
+@FunctionalInterface
 public interface HttpAuthentication {
 
     /**
@@ -34,5 +35,7 @@ public interface HttpAuthentication {
      * @param requestBuilder The HTTP request builder to authenticate
      * @return The same request builder with authentication applied
      */
-    Builder authenticate(HttpClient httpClient, Builder requestBuilder);
+    HttpRequest.Builder authenticate(HttpClient httpClient, HttpRequest.Builder requestBuilder);
+
+    static final HttpAuthentication NONE = (c, b) -> b;
 }
