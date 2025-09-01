@@ -16,6 +16,7 @@
 package io.tileverse.rangereader.http;
 
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.http.HttpRangeReader.Builder;
 import io.tileverse.rangereader.spi.AbstractRangeReaderProvider;
 import io.tileverse.rangereader.spi.RangeReaderConfig;
 import io.tileverse.rangereader.spi.RangeReaderProvider;
@@ -24,7 +25,16 @@ import java.net.URI;
 
 public class HttpRangeReaderProvider extends AbstractRangeReaderProvider {
 
+    /**
+     * Key used as environment variable name to disable this range reader provider
+     * <pre>
+     * {@code export IO_TILEVERSE_RANGEREADER_HTTP=false}
+     * </pre>
+     */
     public static final String ENABLED_KEY = "IO_TILEVERSE_RANGEREADER_HTTP";
+    /**
+     * This range reader implementation's {@link #getId() unique identifier}
+     */
     public static final String ID = "http";
 
     @Override
@@ -50,6 +60,7 @@ public class HttpRangeReaderProvider extends AbstractRangeReaderProvider {
     @Override
     protected RangeReader createInternal(RangeReaderConfig opts) throws IOException {
         URI uri = opts.uri();
-        return HttpRangeReader.builder().uri(uri).build();
+        Builder builder = HttpRangeReader.builder().uri(uri);
+        return builder.build();
     }
 }

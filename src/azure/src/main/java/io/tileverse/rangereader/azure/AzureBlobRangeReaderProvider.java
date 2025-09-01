@@ -16,6 +16,7 @@
 package io.tileverse.rangereader.azure;
 
 import com.azure.storage.blob.BlobClientBuilder;
+import com.azure.storage.common.StorageSharedKeyCredential;
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.azure.AzureBlobRangeReader.Builder;
 import io.tileverse.rangereader.spi.AbstractRangeReaderProvider;
@@ -27,21 +28,60 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * {@link RangeReaderProvider} implementation for Azure Blob Storage.
+ * <p>
+ * The {@link RangeReaderConfig#uri() URI} is used to extract the account, container, and blob name from an Azure Blob Storage URI.
+ * <p>
+ * An Azure Blob Storage URL, or Uniform Resource Locator, refers to the
+ * address used to access resources stored within Azure Blob Storage. There
+ * are several forms of Azure Blob Storage URLs, depending on the context and desired access
+ * method:
+ *
+ * <ul>
+ * <li>{@code https://} URI: This is the canonical URI format for referencing
+ * objects within Azure Blob Storage. It is commonly used within Azure
+ * services, tools, and libraries for internal referencing. For example:
+ * <pre>
+ * {@literal https://your-account-name.blob.core.windows.net/your-container-name/your-blob-name}
+ * </pre>
+ * </ul>
+ * When {@code http/s} URL schemes are used, {@link #canProcessHeaders(Map)} disambiguates
+ * by checking if a header starting with {@code x-ms-} was returned from the HEAD request.
+ */
 public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
 
+    /**
+     * Key used as environment variable name to disable this range reader provider
+     * <pre>
+     * {@code export IO_TILEVERSE_RANGEREADER_AZURE=false}
+     * </pre>
+     */
     public static final String ENABLED_KEY = "IO_TILEVERSE_RANGEREADER_AZURE";
+    /**
+     * This range reader implementation's {@link #getId() unique identifier}
+     */
     public static final String ID = "azure";
 
     /**
+     * Create a new AzureBlobRangeReaderProvider with support for caching decorator
+     */
+    public AzureBlobRangeReaderProvider() {
+        super(true);
+    }
+
+    /**
+     * Set the blob name if the endpoint points to the account url
+     *
      * @see BlobClientBuilder#blobName(String)
      */
-    private static final RangeReaderParameter<String> BLOB_NAME = RangeReaderParameter.builder()
+    public static final RangeReaderParameter<String> BLOB_NAME = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.azure.blob-name")
             .title("Set the blob name if the endpoint points to the account url")
             .description(
                     """
-            		Sets the blob path (e.g. /path/to/file.pmtiles)
-            		
+                    Sets the blob path (e.g. /path/to/file.pmtiles)
+
                     If the endpoint URL is to a blob in the root container, parsing will fail as it will interpret the blob name
                     as the container name. With only one path element, it is impossible to distinguish between a container name and
                     a blob in the root container, so it is assumed to be the container name as this is much more common. When working
@@ -53,24 +93,33 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
             .build();
 
     /**
+     * The account access key used to authenticate the request.
+     * @see StorageSharedKeyCredential
      */
-    private static final RangeReaderParameter<String> ACCOUNT_KEY = RangeReaderParameter.builder()
+    public static final RangeReaderParameter<String> ACCOUNT_KEY = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.azure.account-key")
             .title("Account access key")
             .description(
                     """
                     The account access key used to authenticate the request.
+
+                    When specified, the account name obtained from the URI will be used with this
+                    access key to create a SharedKey credential policy that is put into a header
+                    to authorize requests
                     """)
             .type(String.class)
             .group(ID)
             .build();
 
-    private static final RangeReaderParameter<String> SAS_TOKEN = RangeReaderParameter.builder()
+    /**
+     * SAS token to use for authenticating requests
+     */
+    public static final RangeReaderParameter<String> SAS_TOKEN = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.azure.sas-token")
             .title("SAS token to use for authenticating requests")
             .description(
                     """
-            		Shared Access Signature, a security token generated on the client side to grant limited,
+                    Shared Access Signature, a security token generated on the client side to grant limited,
                     delegated access to Azure resources.
                     This token can also be in the blob URL query string.
                     """)

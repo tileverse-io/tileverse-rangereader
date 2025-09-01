@@ -26,10 +26,53 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * {@link RangeReaderProvider} implementation for AWS S3.
+ * <p>
+ * The {@link RangeReaderConfig#uri() URI} is used to extract the bucket and object name from an S3 URI.
+ * <p>
+ * An S3 URL, or Amazon Simple Storage Service Uniform Resource Locator, refers to the
+ * address used to access resources stored within AWS S3. There
+ * are several forms of S3 URLs, depending on the context and desired access
+ * method:
+ *
+ * <ul>
+ * <li>{@code s3://} URI: This is the canonical URI format for referencing
+ * objects within S3. It is commonly used within AWS
+ * services, tools, and libraries for internal referencing. For example:
+ * <pre>
+ * {@literal s3://your-bucket-name/your-object-name}
+ * </pre>
+ * <li>Public HTTP/HTTPS URLs: If an object is configured for public access, it
+ * can be accessed directly via a standard HTTP or HTTPS URL. These URLs are
+ * typically in the format:
+ * <pre>
+ * {@literal https://your-bucket-name.s3.your-aws-region.amazonaws.com/your-object-name}
+ * </pre>
+ * </ul>
+ * When {@code http/s} URL schemes are used, {@link #canProcessHeaders(Map)} disambiguates
+ * by checking if a header starting with {@code x-amz-} was returned from the HEAD request.
+ */
 public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
 
+    /**
+     * Key used as environment variable name to disable this range reader provider
+     * <pre>
+     * {@code export IO_TILEVERSE_RANGEREADER_S3=false}
+     * </pre>
+     */
     public static final String ENABLED_KEY = "IO_TILEVERSE_RANGEREADER_S3";
+    /**
+     * This range reader implementation's {@link #getId() unique identifier}
+     */
     public static final String ID = "s3";
+
+    /**
+     * Create a new S3RangeReaderProvider with support for caching decorator
+     */
+    public S3RangeReaderProvider() {
+        super(true);
+    }
 
     /**
      * A {@link RangeReaderParameter} to enable or disable S3 path style access. When enabled, requests will use
@@ -37,7 +80,7 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
      * addressing will be used instead (e.g., {@code https://bucket.s3.amazonaws.com/key}). This can be useful for
      * compatibility with S3-compatible storage systems that do not support virtual-hosted-style requests.
      */
-    private static final RangeReaderParameter<Boolean> FORCE_PATH_STYLE = RangeReaderParameter.builder()
+    public static final RangeReaderParameter<Boolean> FORCE_PATH_STYLE = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.s3.force-path-style")
             .title("Enable S3 path style access")
             .description(
@@ -64,7 +107,7 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
      *     <li>Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service</li>
      * </ol>
      */
-    private static final RangeReaderParameter<String> AWS_ACCESS_KEY_ID = RangeReaderParameter.builder()
+    public static final RangeReaderParameter<String> AWS_ACCESS_KEY_ID = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.s3.aws-access-key-id")
             .title("AWS Access Key ID")
             .description(
@@ -88,7 +131,7 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
      *     <li>Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service</li>
      * </ol>
      */
-    private static final RangeReaderParameter<String> AWS_SECRET_ACCESS_KEY = RangeReaderParameter.builder()
+    public static final RangeReaderParameter<String> AWS_SECRET_ACCESS_KEY = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.s3.aws-secret-access-key")
             .title("AWS Secret Access Key")
             .description(

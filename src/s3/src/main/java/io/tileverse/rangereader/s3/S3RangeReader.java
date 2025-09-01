@@ -227,6 +227,14 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
             return forcePathStyle(true);
         }
 
+        /**
+         * Enable or disable S3 path style access. When enabled, requests will use
+         * path-style addressing (e.g., {@code https://s3.amazonaws.com/bucket/key}). When disabled, virtual-hosted-style
+         * addressing will be used instead (e.g., {@code https://bucket.s3.amazonaws.com/key}). This can be useful for
+         * compatibility with S3-compatible storage systems that do not support virtual-hosted-style requests.
+         * @param forcePathStyle whether to enable (true) or disable path style, defaults to {@code false}
+         * @return this builder
+         */
         public Builder forcePathStyle(boolean forcePathStyle) {
             this.forcePathStyle = forcePathStyle;
             return this;

@@ -387,7 +387,8 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
 
                 blobClientBuilder.credential(tokenCredential);
             } else if (endpointUrl.startsWith("https://%s.blob.core.windows.net".formatted(accountName))) {
-                // Use default Azure credential
+                // Use default Azure credential. REVISIT: should this be made a flag and AzureBlobRangeReaderProvider
+                // parameter instead?
                 DefaultAzureCredential defaultAzureCredential = new DefaultAzureCredentialBuilder().build();
                 blobClientBuilder.credential(defaultAzureCredential);
             }
