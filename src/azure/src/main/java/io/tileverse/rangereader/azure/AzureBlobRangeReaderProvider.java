@@ -15,10 +15,12 @@
  */
 package io.tileverse.rangereader.azure;
 
+import com.azure.storage.blob.BlobClientBuilder;
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.azure.AzureBlobRangeReader.Builder;
 import io.tileverse.rangereader.spi.AbstractRangeReaderProvider;
 import io.tileverse.rangereader.spi.RangeReaderConfig;
+import io.tileverse.rangereader.spi.RangeReaderParameter;
 import io.tileverse.rangereader.spi.RangeReaderProvider;
 import java.io.IOException;
 import java.net.URI;
@@ -29,6 +31,54 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
 
     public static final String ENABLED_KEY = "IO_TILEVERSE_RANGEREADER_AZURE";
     public static final String ID = "azure";
+
+    /**
+     * @see BlobClientBuilder#blobName(String)
+     */
+    private static final RangeReaderParameter<String> BLOB_NAME = RangeReaderParameter.builder()
+            .key("io.tileverse.rangereader.azure.blob-name")
+            .title("Set the blob name if the endpoint points to the account url")
+            .description(
+                    """
+            		Sets the blob path (e.g. /path/to/file.pmtiles)
+            		
+                    If the endpoint URL is to a blob in the root container, parsing will fail as it will interpret the blob name
+                    as the container name. With only one path element, it is impossible to distinguish between a container name and
+                    a blob in the root container, so it is assumed to be the container name as this is much more common. When working
+                    with blobs in the root container, it is best to set the endpoint to the account url and specify the blob name
+                    separately using this parameter.
+                    """)
+            .type(String.class)
+            .group(ID)
+            .build();
+
+    /**
+     */
+    private static final RangeReaderParameter<String> ACCOUNT_KEY = RangeReaderParameter.builder()
+            .key("io.tileverse.rangereader.azure.account-key")
+            .title("Account access key")
+            .description(
+                    """
+                    The account access key used to authenticate the request.
+                    """)
+            .type(String.class)
+            .group(ID)
+            .build();
+
+    private static final RangeReaderParameter<String> SAS_TOKEN = RangeReaderParameter.builder()
+            .key("io.tileverse.rangereader.azure.sas-token")
+            .title("SAS token to use for authenticating requests")
+            .description(
+                    """
+            		Shared Access Signature, a security token generated on the client side to grant limited,
+                    delegated access to Azure resources.
+                    This token can also be in the blob URL query string.
+                    """)
+            .type(String.class)
+            .group(ID)
+            .build();
+
+    private static final List<RangeReaderParameter<?>> PARAMS = List.of(BLOB_NAME, ACCOUNT_KEY, SAS_TOKEN);
 
     @Override
     public String getId() {
@@ -51,6 +101,11 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
     }
 
     @Override
+    protected List<RangeReaderParameter<?>> buildParameters() {
+        return PARAMS;
+    }
+
+    @Override
     public boolean canProcess(RangeReaderConfig config) {
         if (!RangeReaderConfig.matches(config, getId(), "http", "https")) {
             return false;
@@ -70,7 +125,10 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
     @Override
     protected RangeReader createInternal(RangeReaderConfig opts) throws IOException {
         URI uri = opts.uri();
-        Builder builder = AzureBlobRangeReader.builder().uri(uri);
+        Builder builder = AzureBlobRangeReader.builder().endpoint(uri);
+        opts.getParameter(BLOB_NAME).ifPresent(builder::blobName);
+        opts.getParameter(ACCOUNT_KEY).ifPresent(builder::accountKey);
+        opts.getParameter(SAS_TOKEN).ifPresent(builder::sasToken);
         return builder.build();
     }
 }

@@ -106,7 +106,7 @@ public class CloudAuthenticationExample {
         // 1. Default credentials (checks env vars, managed identity, Visual Studio, Azure CLI, etc.)
         TokenCredential defaultCredential = new DefaultAzureCredentialBuilder().build();
         RangeReader defaultReader = AzureBlobRangeReader.builder()
-                .uri(azureUri)
+                .endpoint(azureUri)
                 .tokenCredential(defaultCredential)
                 .build();
 
@@ -115,7 +115,7 @@ public class CloudAuthenticationExample {
                 .clientId("client-id") // Optional, if you have multiple identities
                 .build();
         RangeReader managedIdentityReader = AzureBlobRangeReader.builder()
-                .uri(azureUri)
+                .endpoint(azureUri)
                 .tokenCredential(managedIdentityCredential)
                 .build();
 
@@ -126,7 +126,7 @@ public class CloudAuthenticationExample {
                 .clientSecret("client-secret")
                 .build();
         RangeReader servicePrincipalReader = AzureBlobRangeReader.builder()
-                .uri(azureUri)
+                .endpoint(azureUri)
                 .tokenCredential(servicePrincipalCredential)
                 .build();
 
@@ -151,7 +151,7 @@ public class CloudAuthenticationExample {
         // SAS tokens can be included directly in the URI's query string
         URI sasUri = URI.create(
                 "https://mystorageaccount.blob.core.windows.net/container/file.pmtiles?sp=r&st=2023-01-01&se=2024-01-01&spr=https&sv=2022-11-02&sig=signature");
-        RangeReader sasReader = AzureBlobRangeReader.builder().uri(sasUri).build();
+        RangeReader sasReader = AzureBlobRangeReader.builder().endpoint(sasUri).build();
 
         // Clean up resources
         defaultReader.close();

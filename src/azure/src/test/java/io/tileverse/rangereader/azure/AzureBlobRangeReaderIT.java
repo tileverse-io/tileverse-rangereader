@@ -106,7 +106,7 @@ public class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
         Integer port = azurite.getMappedPort(10000);
         URI uri = URI.create("http://localhost:%d/%s/%s/%s".formatted(port, ACCOUNT_NAME, CONTAINER_NAME, BLOB_NAME));
         return AzureBlobRangeReader.builder()
-                .uri(uri) // sets containerName and blobPath
+                .endpoint(uri) // sets containerName and blobPath
                 // authentication
                 // .accountName(ACCOUNT_NAME)//optional when using URI
                 .accountKey(ACCOUNT_KEY)

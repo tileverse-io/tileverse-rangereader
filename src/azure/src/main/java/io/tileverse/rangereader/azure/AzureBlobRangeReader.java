@@ -318,8 +318,9 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          *
          * @param uri the Azure URI (https://account.blob.core.windows.net/container/blob or https://...)
          * @return this builder
+         * @see BlobClientBuilder#endpoint(String)
          */
-        public Builder uri(URI uri) {
+        public Builder endpoint(URI uri) {
             requireNonNull(uri, "URI cannot be null");
             String scheme = uri.getScheme().toLowerCase();
             if (!("https".equals(scheme) || "http".equals(scheme))) {
