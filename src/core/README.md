@@ -586,7 +586,7 @@ For public blobs or when using SAS tokens in the URI:
 
 ```java
 // Using a blob URI with embedded SAS token
-URI blobUri = URI.create("azure://account.blob.core.windows.net/container/blob.pmtiles?sv=2022-11-02&ss=b&srt=co&sp=r&sig=XXX");
+URI blobUri = URI.create("https://account.blob.core.windows.net/container/blob.pmtiles?sv=2022-11-02&ss=b&srt=co&sp=r&sig=XXX");
 RangeReader reader = RangeReaderFactory.create(blobUri);
 ```
 

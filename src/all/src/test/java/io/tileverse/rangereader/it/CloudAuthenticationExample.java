@@ -135,7 +135,7 @@ public class CloudAuthenticationExample {
                 .accountName("mystorageaccount")
                 .accountCredentials("mystorageaccount", "accountkey==") // Replace with actual key
                 .containerName("container")
-                .blobPath("file.pmtiles")
+                .blobName("file.pmtiles")
                 .build();
 
         // 5. Connection string
@@ -144,7 +144,7 @@ public class CloudAuthenticationExample {
         RangeReader connectionStringReader = AzureBlobRangeReader.builder()
                 .connectionString(connectionString)
                 .containerName("container")
-                .blobPath("file.pmtiles")
+                .blobName("file.pmtiles")
                 .build();
 
         // 6. SAS token (Shared Access Signature)

@@ -36,6 +36,7 @@ class CachingProviderHelper {
      */
     private static final RangeReaderParameter<Boolean> MEMORY_CACHE = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.caching.enabled")
+            .title("Enable memory cache for raw byte data")
             .description("Enable memory cache for raw byte data")
             .type(Boolean.class)
             .group(GROUP)
@@ -48,6 +49,7 @@ class CachingProviderHelper {
      */
     private static final RangeReaderParameter<Boolean> MEMORY_CACHE_BLOCK_ALIGNED = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.caching.blockaligned")
+            .title("Apply block alignment for cached byte ranges")
             .description("Apply block alignment for cached byte ranges")
             .type(Boolean.class)
             .group(GROUP)
@@ -60,6 +62,7 @@ class CachingProviderHelper {
      */
     private static final RangeReaderParameter<Integer> MEMORY_CACHE_BLOCK_SIZE = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.caching.blocksize")
+            .title("Cache block size in bytes (power of 2)")
             .description("Cache block size in bytes (power of 2)")
             .type(Integer.class)
             .group(GROUP)

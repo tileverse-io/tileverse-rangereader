@@ -27,6 +27,7 @@ import java.util.Optional;
  *
  * @param <T> The type of the parameter's value.
  * @param key The unique key identifying the parameter.
+ * @param title A human-readable title of the parameter.
  * @param description A human-readable description of the parameter.
  * @param group A logical grouping for the parameter (e.g., "memory-cache").
  * @param type The {@link Class} representing the type of the parameter's value.
@@ -34,9 +35,16 @@ import java.util.Optional;
  * @param sampleValues A list of sample or suggested values for the parameter.
  */
 public record RangeReaderParameter<T>(
-        String key, String description, String group, Class<T> type, Optional<T> defaultValue, List<T> sampleValues) {
+        String key,
+        String title,
+        String description,
+        String group,
+        Class<T> type,
+        Optional<T> defaultValue,
+        List<T> sampleValues) {
     public RangeReaderParameter {
         requireNonNull(key, "Parameter key cannot be null");
+        requireNonNull(title, "Parameter title cannot be null");
         requireNonNull(description, "Parameter description cannot be null");
         requireNonNull(group, "Parameter group cannot be null");
         requireNonNull(type, "Parameter type cannot be null");
@@ -58,6 +66,7 @@ public record RangeReaderParameter<T>(
      */
     public static class Builder {
         String key;
+        String title;
         String description;
         String group;
 
@@ -75,6 +84,16 @@ public record RangeReaderParameter<T>(
          */
         public Builder key(String key) {
             this.key = key;
+            return this;
+        }
+        /**
+         * Sets the human-readable title for the parameter.
+         *
+         * @param title The parameter title.
+         * @return This builder instance.
+         */
+        public Builder title(String title) {
+            this.title = title;
             return this;
         }
 
@@ -142,7 +161,7 @@ public record RangeReaderParameter<T>(
          */
         @SuppressWarnings("unchecked")
         public <T> RangeReaderParameter<T> build() {
-            return new RangeReaderParameter<>(key, description, group, type, defaultValue, sampleValues);
+            return new RangeReaderParameter<>(key, title, description, group, type, defaultValue, sampleValues);
         }
     }
 }

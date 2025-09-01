@@ -22,8 +22,10 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.OptionalLong;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.regions.Region;
@@ -144,7 +146,32 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
         private String bucket;
         private String key;
 
+        private String awsAccessKeyId;
+        private String awsSecretAccessKey;
+
         private Builder() {}
+
+        /**
+         * Sets the AWS access key ID.
+         *
+         * @param awsAccessKeyId the AWS access key ID
+         * @return this builder
+         */
+        public Builder awsAccessKeyId(String awsAccessKeyId) {
+            this.awsAccessKeyId = awsAccessKeyId;
+            return this;
+        }
+
+        /**
+         * Sets the AWS secret access key.
+         *
+         * @param awsSecretAccessKey the AWS secret access key
+         * @return this builder
+         */
+        public Builder awsSecretAccessKey(String awsSecretAccessKey) {
+            this.awsSecretAccessKey = awsSecretAccessKey;
+            return this;
+        }
 
         /**
          * Sets the S3 client to use.
@@ -197,7 +224,11 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * @return this builder
          */
         public Builder forcePathStyle() {
-            this.forcePathStyle = true;
+            return forcePathStyle(true);
+        }
+
+        public Builder forcePathStyle(boolean forcePathStyle) {
+            this.forcePathStyle = forcePathStyle;
             return this;
         }
 
@@ -278,6 +309,9 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
 
                 if (credentialsProvider != null) {
                     builder.credentialsProvider(credentialsProvider);
+                } else if (awsAccessKeyId != null && awsSecretAccessKey != null) {
+                    builder.credentialsProvider(StaticCredentialsProvider.create(
+                            AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey)));
                 } else {
                     builder.credentialsProvider(
                             DefaultCredentialsProvider.builder().build());

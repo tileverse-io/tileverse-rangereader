@@ -16,6 +16,7 @@
 package io.tileverse.rangereader.azure;
 
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.azure.AzureBlobRangeReader.Builder;
 import io.tileverse.rangereader.spi.AbstractRangeReaderProvider;
 import io.tileverse.rangereader.spi.RangeReaderConfig;
 import io.tileverse.rangereader.spi.RangeReaderProvider;
@@ -68,6 +69,8 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
 
     @Override
     protected RangeReader createInternal(RangeReaderConfig opts) throws IOException {
-        return AzureBlobRangeReader.builder().uri(opts.uri()).build();
+        URI uri = opts.uri();
+        Builder builder = AzureBlobRangeReader.builder().uri(uri);
+        return builder.build();
     }
 }

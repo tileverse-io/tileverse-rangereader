@@ -1,1 +1,1 @@
-io.tileverse.rangereader.gcs.AzureBlobRangeReaderProvider
+io.tileverse.rangereader.gcs.GoogleCloudStorageRangeReaderProvider
