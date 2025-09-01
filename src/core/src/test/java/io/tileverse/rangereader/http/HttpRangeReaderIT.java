@@ -133,7 +133,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
             assertTrue(reader instanceof HttpRangeReader, "Should be an HttpRangeReader instance");
 
             // Verify size matches
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
 
             // Read some data to verify it works correctly
             ByteBuffer buffer = reader.readRange(0, 10).flip();
@@ -153,7 +153,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
             assertTrue(reader instanceof HttpRangeReader, "Should be an HttpRangeReader instance");
 
             // Verify size matches
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
         }
     }
 
@@ -174,7 +174,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
         // Test making multiple consecutive range requests to verify connection handling
         try (RangeReader reader = createBaseReader()) {
             // Verify size as sanity check
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
 
             // Make multiple consecutive range requests
             for (int i = 0; i < 5; i++) {

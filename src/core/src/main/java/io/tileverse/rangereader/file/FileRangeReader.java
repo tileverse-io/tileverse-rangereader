@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 /**
  * A thread-safe file-based implementation of {@link RangeReader} that provides efficient random access to local files.
@@ -143,8 +144,8 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
      * @throws IOException if an I/O error occurs while determining the file size
      */
     @Override
-    public long size() throws IOException {
-        return channel.size();
+    public OptionalLong size() throws IOException {
+        return OptionalLong.of(channel.size());
     }
 
     /**

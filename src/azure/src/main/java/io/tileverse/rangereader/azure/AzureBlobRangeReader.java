@@ -32,6 +32,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -110,7 +111,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         if (contentLength < 0) {
             try {
                 contentLength = blobClient.getProperties().getBlobSize();
@@ -118,7 +119,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
                 throw new IOException("Failed to get blob size: " + e.getMessage(), e);
             }
         }
-        return contentLength;
+        return OptionalLong.of(contentLength);
     }
 
     @Override

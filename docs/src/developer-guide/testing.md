@@ -448,11 +448,10 @@ class CachingRangeReaderTest {
 
 ```java
 @ParameterizedTest
-@ValueSource(ints = {64, 1024, 4096, 64 * 1024})
-void testVariousBlockSizes(int blockSize) throws IOException {
-    try (var reader = BlockAlignedRangeReader.builder()
-            .delegate(baseReader)
-            .blockSize(blockSize)
+@ValueSource(ints = {100, 1000, 10000})
+void testVariousCacheSizes(int cacheSize) throws IOException {
+    try (var reader = CachingRangeReader.builder(baseReader)
+            .maximumSize(cacheSize)
             .build()) {
         
         ByteBuffer data = reader.readRange(100, 500);

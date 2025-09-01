@@ -21,6 +21,7 @@ import io.tileverse.rangereader.RangeReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 /**
  * A decorator for RangeReader that aligns all read requests to fixed-size
@@ -177,7 +178,7 @@ public class BlockAlignedRangeReader extends AbstractRangeReader implements Rang
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         return delegate.size();
     }
 

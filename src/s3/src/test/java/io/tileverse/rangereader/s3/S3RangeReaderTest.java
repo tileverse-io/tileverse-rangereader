@@ -127,7 +127,7 @@ class S3RangeReaderTest {
 
     @Test
     void testGetSize() throws IOException {
-        assertEquals(CONTENT_LENGTH, reader.size());
+        assertEquals(CONTENT_LENGTH, reader.size().getAsLong());
         verify(s3Client, times(1)).headObject(any(HeadObjectRequest.class));
     }
 

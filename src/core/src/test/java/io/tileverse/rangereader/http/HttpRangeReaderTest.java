@@ -98,7 +98,7 @@ class HttpRangeReaderTest {
 
     @Test
     void testGetSize() throws IOException {
-        assertEquals(TEST_DATA.length, reader.size());
+        assertThat(reader.size()).hasValue(TEST_DATA.length);
 
         // Verify that HEAD request was made
         wm.verify(headRequestedFor(urlEqualTo(TEST_PATH)));
@@ -445,7 +445,7 @@ class HttpRangeReaderTest {
     }
 
     @Test
-    void testMissingContentLengthHeader() {
+    void testMissingContentLengthHeader() throws IOException {
         // Test behavior when Content-Length header is missing
         wm.stubFor(head(urlEqualTo("/no-content-length"))
                 .willReturn(
@@ -457,9 +457,7 @@ class HttpRangeReaderTest {
 
         try (HttpRangeReader reader =
                 HttpRangeReader.builder(noContentLengthUri).build()) {
-            // size() should throw when content length is missing
-            IOException ex = assertThrows(IOException.class, () -> reader.size());
-            assertThat(ex.getMessage()).contains("Content length header missing");
+            assertThat(reader.size()).isEmpty();
         }
     }
 
@@ -480,9 +478,7 @@ class HttpRangeReaderTest {
         HttpRangeReader reader =
                 HttpRangeReader.builder(invalidContentLengthUri).build();
 
-        // size() should throw for invalid content length
-        IOException ex = assertThrows(IOException.class, () -> reader.size());
-        assertThat(ex.getMessage()).contains("Invalid content length header");
+        assertThat(reader.size()).isEmpty();
     }
 
     @Test

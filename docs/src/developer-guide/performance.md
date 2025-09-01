@@ -28,8 +28,6 @@ Performance optimization involves multiple layers:
 Application Layer
     ↓
 Memory Cache (CachingRangeReader)
-    ↓  
-Block Alignment (BlockAlignedRangeReader)
     ↓
 Disk Cache (DiskCachingRangeReader)
     ↓
@@ -79,49 +77,41 @@ var reader = DiskCachingRangeReader.builder(baseReader)
     .build();
 ```
 
-### 2. Block Alignment Optimization
+### 2. Intelligent Caching Strategies
 
-#### Single Block Size Strategy
+#### Memory Caching for Frequent Access
 
-Use consistent block sizes for simple scenarios:
+Optimize for frequently accessed data:
 
 ```java
-// Cloud storage optimization
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(cloudReader)
-    .blockSize(4 * 1024 * 1024)          // 4MB blocks
-    .prefetchEnabled(true)               // Prefetch adjacent blocks
+// Cloud storage with memory caching
+var reader = CachingRangeReader.builder(cloudReader)
+    .maximumSize(2000)                   // Cache frequently accessed ranges
+    .expireAfterAccess(30, TimeUnit.MINUTES)
+    .recordStats()                       // Monitor cache performance
     .build();
 
-// Cloud storage optimization (local files don't benefit from block alignment)
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(httpReader)
-    .blockSize(1024 * 1024)              // 1MB blocks for HTTP
+// HTTP with memory caching for repeated requests
+var reader = CachingRangeReader.builder(httpReader)
+    .maximumSize(1000)                   // Moderate cache size
+    .maxSizeBytes(256 * 1024 * 1024)     // 256MB memory limit
     .build();
 ```
 
-#### Dual Block Size Strategy
+#### Multi-Level Caching Strategy
 
-Use different block sizes for memory vs. disk optimization:
+Combine memory and disk caching for optimal performance:
 
 ```java
 // Optimal decorator stacking for cloud storage
 var reader = 
-    // Memory cache with small blocks for granular access
+    // Memory cache for immediate access
     CachingRangeReader.builder(
-        BlockAlignedRangeReader.builder()
-            .delegate(
-                // Disk cache with large blocks for I/O efficiency
-                DiskCachingRangeReader.builder(
-                    BlockAlignedRangeReader.builder()
-                        .delegate(s3Reader)
-                        .blockSize(4 * 1024 * 1024)    // 4MB disk blocks
-                        .build())
-                    .maxCacheSizeBytes(5L * 1024 * 1024 * 1024)  // 5GB disk
-                    .build())
-            .blockSize(256 * 1024)                      // 256KB memory blocks
+        // Disk cache for persistence and large datasets
+        DiskCachingRangeReader.builder(s3Reader)
+            .maxCacheSizeBytes(5L * 1024 * 1024 * 1024)  // 5GB disk
             .build())
-        .maximumSize(1000)
+        .maximumSize(1000)                              // 1000 entries in memory
         .build();
 ```
 
@@ -285,11 +275,10 @@ var reader = S3RangeReader.builder()
     .pathStyleAccess(false)                // Virtual-hosted style
     .build();
 
-// Large object optimization
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(s3Reader)
-    .blockSize(8 * 1024 * 1024)           // 8MB blocks for large objects
-    .prefetchCount(2)                     // Prefetch next 2 blocks
+// Large object optimization with caching
+var reader = CachingRangeReader.builder(s3Reader)
+    .maximumSize(500)                     // Cache for large objects
+    .maxSizeBytes(512 * 1024 * 1024)      // 512MB for large chunks
     .build();
 ```
 
@@ -306,10 +295,10 @@ var reader = AzureBlobRangeReader.builder()
         .setRetryDelayInMs(100))
     .build();
 
-// Hot tier optimization
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(azureReader)
-    .blockSize(4 * 1024 * 1024)           // 4MB blocks for hot tier
+// Hot tier optimization with caching
+var reader = CachingRangeReader.builder(azureReader)
+    .maximumSize(1000)                    // Cache for hot tier access
+    .expireAfterAccess(1, TimeUnit.HOURS) // Longer retention for hot data
     .build();
 ```
 
@@ -343,12 +332,11 @@ var reader = CachingRangeReader.builder(baseReader)
     .maxSizeBytes(1024 * 1024 * 1024)     // 1GB cache
     .build();
 
-// Add block alignment
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(CachingRangeReader.builder(baseReader)
-        .maximumSize(2000)
-        .build())
-    .blockSize(1024 * 1024)               // 1MB aligned blocks
+// Optimize caching strategy
+var reader = CachingRangeReader.builder(baseReader)
+    .maximumSize(2000)                    // Increase cache size
+    .maxSizeBytes(512 * 1024 * 1024)      // 512MB memory limit
+    .recordStats()                        // Monitor performance
     .build();
 ```
 
@@ -378,10 +366,9 @@ var reader = DiskCachingRangeReader.builder(baseReader)
 **Solutions**:
 
 ```java
-// Increase block sizes
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(cloudReader)
-    .blockSize(8 * 1024 * 1024)          // 8MB blocks
+// Use disk caching for better throughput
+var reader = DiskCachingRangeReader.builder(cloudReader)
+    .maxCacheSizeBytes(2L * 1024 * 1024 * 1024)  // 2GB disk cache
     .build();
 
 // Increase timeouts
@@ -464,10 +451,10 @@ void memoryLeakTest() throws Exception {
 
 ### Configuration Guidelines
 
-1. **Block Sizes**:
-   - Local files: 64KB-1MB
-   - HTTP: 256KB-1MB
-   - Cloud storage: 1MB-8MB
+1. **Read Strategies**:
+   - Local files: Direct access (OS caching is optimal)
+   - HTTP: Chunked reads with caching
+   - Cloud storage: Large reads with multi-level caching
 
 2. **Cache Sizing**:
    - Memory cache: 10-20% of available heap
@@ -508,11 +495,7 @@ void memoryLeakTest() throws Exception {
    ```java
    // Production-ready configuration
    var reader = CachingRangeReader.builder(
-       DiskCachingRangeReader.builder(
-           BlockAlignedRangeReader.builder()
-               .delegate(cloudReader)
-               .blockSize(4 * 1024 * 1024)
-               .build())
+       DiskCachingRangeReader.builder(cloudReader)
            .maxCacheSizeBytes(5L * 1024 * 1024 * 1024)
            .build())
        .maximumSize(2000)

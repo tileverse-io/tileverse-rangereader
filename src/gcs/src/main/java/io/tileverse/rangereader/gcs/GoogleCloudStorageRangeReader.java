@@ -28,6 +28,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -99,11 +100,12 @@ public class GoogleCloudStorageRangeReader extends AbstractRangeReader implement
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         if (blob == null || !blob.exists()) {
             throw new IOException("GCS object not found: gs://" + bucket + "/" + objectName);
         }
-        return blob.getSize().longValue();
+        Long size = blob.getSize();
+        return size == null ? OptionalLong.empty() : OptionalLong.of(size.longValue());
     }
 
     @Override

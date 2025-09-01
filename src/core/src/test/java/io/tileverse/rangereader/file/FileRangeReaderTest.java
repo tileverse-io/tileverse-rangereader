@@ -89,7 +89,7 @@ public class FileRangeReaderTest {
 
     @Test
     void testGetSize() throws IOException {
-        assertEquals(textContent.length(), reader.size());
+        assertEquals(textContent.length(), reader.size().getAsLong());
     }
 
     @Test
@@ -244,7 +244,7 @@ public class FileRangeReaderTest {
 
         try (FileRangeReader binaryReader = FileRangeReader.of(binaryFile)) {
             // Check size
-            assertEquals(binaryContent.length, binaryReader.size());
+            assertEquals(binaryContent.length, binaryReader.size().getAsLong());
 
             // Read full content
             ByteBuffer fullBuffer =
@@ -281,7 +281,7 @@ public class FileRangeReaderTest {
 
         try (FileRangeReader largeReader = FileRangeReader.of(largeFile)) {
             // Check size
-            assertEquals(size, largeReader.size());
+            assertEquals(size, largeReader.size().getAsLong());
 
             // Read 100KB from the middle
             int offset = 400 * 1024; // 400KB offset
@@ -308,7 +308,7 @@ public class FileRangeReaderTest {
 
         try (FileRangeReader emptyReader = FileRangeReader.of(emptyFile)) {
             // Size should be 0
-            assertEquals(0, emptyReader.size());
+            assertEquals(0, emptyReader.size().getAsLong());
 
             // Reading should return empty buffer
             ByteBuffer buffer = emptyReader.readRange(0, 10).flip();

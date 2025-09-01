@@ -69,7 +69,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     private final HttpClient httpClient;
     private final HttpAuthentication authentication;
 
-    private volatile Long contentLength;
+    private volatile OptionalLong contentLength;
     private volatile boolean rangeInitialized = false;
     private volatile HttpResponse<Void> cachedHeadResponse = null;
 
@@ -187,7 +187,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         if (contentLength == null) {
             synchronized (this) {
                 if (contentLength == null) {
@@ -264,14 +264,11 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         HttpResponse<Void> headResponse = getHeadResponse();
 
         // Get content length
-        OptionalLong contentLengthHeader = headResponse.headers().firstValueAsLong("Content-Length");
-        if (contentLengthHeader.isPresent()) {
-            this.contentLength = contentLengthHeader.getAsLong();
-            if (this.contentLength < 0) {
-                throw new IOException("Invalid content length header: " + contentLength);
-            }
-        } else {
-            throw new IOException("Content length header missing");
+        this.contentLength = headResponse.headers().firstValueAsLong("Content-Length");
+        if (this.contentLength.isEmpty()) {
+            LOGGER.warning("Content-Length unkown for " + uri);
+        } else if (this.contentLength.getAsLong() < 0) {
+            this.contentLength = OptionalLong.empty();
         }
     }
 

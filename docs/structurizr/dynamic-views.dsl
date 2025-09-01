@@ -24,7 +24,6 @@ workspace "Tileverse Range Reader - Dynamic Views" "Runtime scenarios for the Ti
                 # Decorators
                 cachingRangeReader = component "CachingRangeReader" "In-memory caching decorator" "Java Class"
                 diskCachingRangeReader = component "DiskCachingRangeReader" "Disk-based caching decorator" "Java Class"
-                blockAlignedRangeReader = component "BlockAlignedRangeReader" "Block alignment optimization decorator" "Java Class"
                 
                 # Authentication
                 authenticationSystem = component "Authentication System" "HTTP authentication implementations" "Java Package"
@@ -46,7 +45,6 @@ workspace "Tileverse Range Reader - Dynamic Views" "Runtime scenarios for the Ti
         application -> httpRangeReader "Uses for HTTP reading"
         application -> cachingRangeReader "Uses for cached reading"
         application -> diskCachingRangeReader "Uses for disk cached reading"
-        application -> blockAlignedRangeReader "Uses for block aligned reading"
         application -> s3RangeReader "Uses for S3 reading"
         
         # Core component relationships
@@ -60,13 +58,10 @@ workspace "Tileverse Range Reader - Dynamic Views" "Runtime scenarios for the Ti
         # Decorator relationships
         cachingRangeReader -> rangeReaderInterface "Implements"
         diskCachingRangeReader -> rangeReaderInterface "Implements"
-        blockAlignedRangeReader -> rangeReaderInterface "Implements"
         
         # Decorator chaining relationships
         cachingRangeReader -> diskCachingRangeReader "Delegates to"
-        diskCachingRangeReader -> blockAlignedRangeReader "Delegates to"
-        blockAlignedRangeReader -> fileRangeReader "Delegates to"
-        blockAlignedRangeReader -> httpRangeReader "Delegates to"
+        diskCachingRangeReader -> fileRangeReader "Delegates to"
         diskCachingRangeReader -> httpRangeReader "Delegates to"
         
         # External system relationships
@@ -120,14 +115,12 @@ workspace "Tileverse Range Reader - Dynamic Views" "Runtime scenarios for the Ti
             
             application -> cachingRangeReader "1. readRange(offset, length)"
             cachingRangeReader -> diskCachingRangeReader "2. cache miss - delegate"
-            diskCachingRangeReader -> blockAlignedRangeReader "3. cache miss - delegate"
-            blockAlignedRangeReader -> fileRangeReader "4. delegate to base reader"
-            fileRangeReader -> localFileSystem "5. file range request"
-            localFileSystem -> fileRangeReader "6. returns data"
-            fileRangeReader -> blockAlignedRangeReader "7. returns data"
-            blockAlignedRangeReader -> diskCachingRangeReader "8. returns aligned data"
-            diskCachingRangeReader -> cachingRangeReader "9. returns data"
-            cachingRangeReader -> application "10. returns cached data"
+            diskCachingRangeReader -> fileRangeReader "3. delegate to base reader"
+            fileRangeReader -> localFileSystem "4. file range request"
+            localFileSystem -> fileRangeReader "5. returns data"
+            fileRangeReader -> diskCachingRangeReader "6. returns data"
+            diskCachingRangeReader -> cachingRangeReader "7. returns data"
+            cachingRangeReader -> application "8. returns cached data"
             
             autoLayout
         }

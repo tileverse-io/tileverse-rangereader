@@ -15,6 +15,8 @@
  */
 package io.tileverse.rangereader;
 
+import static java.util.Objects.requireNonNull;
+
 import io.tileverse.io.ByteBufferPool;
 import io.tileverse.io.ByteRange;
 import io.tileverse.io.SeekableByteChannelImageInputStream;
@@ -23,6 +25,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.util.OptionalLong;
 import javax.imageio.stream.ImageInputStream;
 
 /**
@@ -61,6 +64,10 @@ public interface RangeReader extends Closeable {
         return buffer;
     }
 
+    default ByteBuffer readRange(ByteRange range) throws IOException {
+        return readRange(requireNonNull(range).offset(), range.length());
+    }
+
     /**
      * Reads bytes from the source at the specified offset into the provided target
      * buffer.
@@ -94,10 +101,10 @@ public interface RangeReader extends Closeable {
      * <p>
      * Implementations MUST ensure this method is thread-safe.
      *
-     * @return The size in bytes
+     * @return The size in bytes, or empty if unknown
      * @throws IOException If an I/O error occurs
      */
-    long size() throws IOException;
+    OptionalLong size() throws IOException;
 
     /**
      * Gets a unique identifier for the source being read.

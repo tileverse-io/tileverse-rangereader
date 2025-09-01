@@ -137,7 +137,9 @@ public final class RangeReaderSeekableByteChannel extends RangeReaderReadableByt
         try {
             return String.format(
                     "RangeReaderSeekableByteChannel[source=%s, position=%d, size=%d]",
-                    rangeReader.getSourceIdentifier(), position.get(), rangeReader.size());
+                    rangeReader.getSourceIdentifier(),
+                    position.get(),
+                    rangeReader.size().orElse(-1));
         } catch (IOException e) {
             return String.format(
                     "RangeReaderSeekableByteChannel[source=%s, position=%d, size=unknown]",

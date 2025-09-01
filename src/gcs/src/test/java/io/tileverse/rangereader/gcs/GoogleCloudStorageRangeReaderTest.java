@@ -122,7 +122,7 @@ class GoogleCloudStorageRangeReaderTest {
 
     @Test
     void testGetSize() throws IOException {
-        assertEquals(CONTENT_LENGTH, reader.size());
+        assertEquals(CONTENT_LENGTH, reader.size().getAsLong());
         verify(storage, times(1)).get(BlobId.of(BUCKET, OBJECT_NAME));
     }
 
@@ -240,11 +240,11 @@ class GoogleCloudStorageRangeReaderTest {
     @Test
     void testGetSizeFromCachedValue() throws IOException {
         // First call should query the blob
-        assertEquals(CONTENT_LENGTH, reader.size());
+        assertEquals(CONTENT_LENGTH, reader.size().getAsLong());
         verify(storage, times(1)).get(BlobId.of(BUCKET, OBJECT_NAME));
 
         // Second call should use cached value
-        assertEquals(CONTENT_LENGTH, reader.size());
+        assertEquals(CONTENT_LENGTH, reader.size().getAsLong());
         verify(storage, times(1)).get(BlobId.of(BUCKET, OBJECT_NAME)); // Still only one call
     }
 
@@ -271,7 +271,7 @@ class GoogleCloudStorageRangeReaderTest {
                 .objectName(OBJECT_NAME)
                 .build();
 
-        assertEquals(CONTENT_LENGTH, builtReader.size());
+        assertEquals(CONTENT_LENGTH, builtReader.size().getAsLong());
     }
 
     @Test
@@ -298,7 +298,7 @@ class GoogleCloudStorageRangeReaderTest {
                 .uri(uri)
                 .build();
 
-        assertEquals(CONTENT_LENGTH, builtReader.size());
+        assertEquals(CONTENT_LENGTH, builtReader.size().getAsLong());
     }
 
     @Test

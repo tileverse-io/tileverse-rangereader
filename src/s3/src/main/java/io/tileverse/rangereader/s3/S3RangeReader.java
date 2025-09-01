@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.OptionalLong;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
@@ -44,7 +45,7 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
     private final S3Client s3Client;
     private final String bucket;
     private final String key;
-    private long contentLength = -1;
+    private final OptionalLong contentLength;
 
     /**
      * Creates a new S3RangeReader for the specified S3 object.
@@ -65,7 +66,8 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
                     HeadObjectRequest.builder().bucket(bucket).key(key).build();
 
             HeadObjectResponse headResponse = s3Client.headObject(headRequest);
-            this.contentLength = headResponse.contentLength();
+            Long size = headResponse.contentLength();
+            this.contentLength = size == null ? OptionalLong.empty() : OptionalLong.of(size);
         } catch (NoSuchKeyException e) {
             throw new IOException("S3 object does not exist: s3://" + bucket + "/" + key, e);
         } catch (SdkException e) {
@@ -107,18 +109,7 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
     }
 
     @Override
-    public long size() throws IOException {
-        if (contentLength < 0) {
-            try {
-                HeadObjectRequest headRequest =
-                        HeadObjectRequest.builder().bucket(bucket).key(key).build();
-
-                HeadObjectResponse headResponse = s3Client.headObject(headRequest);
-                contentLength = headResponse.contentLength();
-            } catch (SdkException e) {
-                throw new IOException("Failed to get S3 object size: " + e.getMessage(), e);
-            }
-        }
+    public OptionalLong size() throws IOException {
         return contentLength;
     }
 

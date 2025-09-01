@@ -575,7 +575,7 @@ The following APIs follow semantic versioning guarantees:
 - **`RangeReader` interface**: Core contract that won't change incompatibly
 - **`AbstractRangeReader` public methods**: Base implementation signatures  
 - **Builder public APIs**: All builder methods and their behavior
-- **Core decorator classes**: `CachingRangeReader`, `DiskCachingRangeReader`, `BlockAlignedRangeReader`
+- **Core decorator classes**: `CachingRangeReader`, `DiskCachingRangeReader`
 
 Changes to these APIs require major version increments and migration guides.
 

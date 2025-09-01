@@ -69,9 +69,6 @@ workspace "Tileverse Range Reader" "Architecture documentation for Tileverse Ran
                     tags "Decorator"
                 }
                 
-                blockAlignedRangeReader = component "BlockAlignedRangeReader" "Block alignment optimization decorator" "Java Class" {
-                    tags "Decorator"
-                }
                 
                 # Authentication
                 authenticationSystem = component "Authentication System" "HTTP authentication implementations" "Java Package" {
@@ -155,7 +152,6 @@ workspace "Tileverse Range Reader" "Architecture documentation for Tileverse Ran
         
         cachingRangeReader -> rangeReaderInterface "Implements (decorator)"
         diskCachingRangeReader -> rangeReaderInterface "Implements (decorator)"
-        blockAlignedRangeReader -> rangeReaderInterface "Implements (decorator)"
         
         httpRangeReader -> authenticationSystem "Uses for authentication"
         

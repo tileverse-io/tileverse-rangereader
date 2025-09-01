@@ -200,7 +200,7 @@ class BlockAlignedRangeReaderTest {
     @Test
     void testDelegateSize() throws IOException {
         // Check that size() delegates to the underlying reader
-        assertEquals(textContent.length(), reader.size());
+        assertEquals(textContent.length(), reader.size().getAsLong());
     }
 
     @Test

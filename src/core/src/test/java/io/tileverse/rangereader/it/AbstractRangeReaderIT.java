@@ -137,7 +137,7 @@ public abstract class AbstractRangeReaderIT {
     public void testBaseRangeReader() throws IOException {
         try (RangeReader reader = createBaseReader()) {
             // Verify size
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
 
             // Read the first 127 bytes (header)
             ByteBuffer headerBuffer = reader.readRange(0, 127).flip();

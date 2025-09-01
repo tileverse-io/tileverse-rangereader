@@ -64,7 +64,7 @@ graph TD
 - Abstract base classes with common functionality
 - Local file system implementation (`FileRangeReader`)
 - HTTP/HTTPS implementation (`HttpRangeReader`)
-- Performance decorators (caching, block alignment, disk caching)
+- Performance decorators (caching, disk caching)
 - Authentication framework for HTTP sources
 
 ### Cloud Provider Modules (`s3`, `azure`, `gcs`)
@@ -97,7 +97,6 @@ graph TD
 | **GoogleCloudStorageRangeReader** | Read ranges from Google Cloud Storage |
 | **CachingRangeReader** | Provide in-memory caching with configurable policies |
 | **DiskCachingRangeReader** | Provide persistent disk-based caching |
-| **BlockAlignedRangeReader** | Optimize reads through block alignment |
 
 ## Core Design Patterns
 
@@ -108,21 +107,16 @@ The library is built on proven architectural patterns that provide flexibility, 
 The primary architectural pattern enabling composable functionality:
 
 ```java
-// ⚠️ CRITICAL: Decorator order matters for optimal performance!
-// BlockAlignedRangeReader must ALWAYS wrap caching decorators
+// ✅ CORRECT: Proper decorator stacking order
 RangeReader reader = 
-    BlockAlignedRangeReader.builder()          // ← Outermost: aligns requests  
-        .delegate(CachingRangeReader.builder(   // ← Memory caching (non-overlapping)
-            BlockAlignedRangeReader.builder()   // ← Aligns for disk cache
-                .delegate(DiskCachingRangeReader.builder(  // ← Persistent caching
-                    S3RangeReader.builder()     // ← Base implementation
-                        .uri(uri)
-                        .build())
-                    .build())
-                .blockSize(1024 * 1024)         // ← 1MB blocks for disk
+    CachingRangeReader.builder(             // ← Outermost: memory caching
+        DiskCachingRangeReader.builder(     // ← Persistent caching
+            S3RangeReader.builder()         // ← Base implementation
+                .uri(uri)
                 .build())
+            .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB disk cache
             .build())
-        .blockSize(64 * 1024)                   // ← 64KB blocks for memory
+        .maximumSize(1000)                  // 1000 entries in memory
         .build();
 ```
 
@@ -202,9 +196,9 @@ All `RangeReader` implementations MUST be thread-safe. This is achieved through:
 - **L2 (Disk)**: Persistent, larger capacity.
 - **L3 (Network/Disk)**: Authoritative source.
 
-### Block Alignment
+### Read Optimization
 
-Block alignment reduces the number of requests for sequential reads by fetching a larger block and serving subsequent requests from the cached block.
+The library optimizes read patterns through intelligent caching strategies. Memory caching provides fast access to frequently used ranges, while disk caching offers persistence for large datasets across application sessions.
 
 ## Error Handling Architecture
 
