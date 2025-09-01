@@ -442,6 +442,16 @@ export HTTP_PROXY=http://proxy.company.com:8080
 export HTTPS_PROXY=https://proxy.company.com:8080
 ```
 
+## Extending RangeReader Functionality
+
+The Tileverse Range Reader library is designed to be highly extensible, allowing you to easily add support for new data sources or custom protocols beyond the built-in `file://`, `http(s)://`, `s3://`, and `gs://` options (cloud providers like Azure are automatically detected from `http(s)` URLs).
+
+This is achieved through a powerful plugin mechanism. If you have a unique storage system or a specific way of accessing data that isn't covered by the standard implementations, you can create your own "custom reader" and integrate it seamlessly with the library.
+
+Once your custom reader is developed and properly configured, the `RangeReaderFactory` will automatically discover it and use it when you request a `RangeReader` for a URI that your custom reader can handle. This means you can extend the library's capabilities without modifying its core code.
+
+For detailed technical instructions on how to develop and register a new custom reader, please refer to the [Extension Architecture](../developer-guide/architecture.md#service-provider-interface-spi) section in the Developer Guide.
+
 ## Resource Management Patterns
 
 ### Short-term Usage

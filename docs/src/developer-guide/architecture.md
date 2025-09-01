@@ -86,9 +86,11 @@ graph TD
 
 ### Component Responsibilities
 
-| Component | Responsibility | 
+| Component | Responsibility |
 |-----------|---------------|
 | **RangeReader** | Define the contract for reading byte ranges |
+| **RangeReaderProvider** | Service Provider Interface for discovering and creating RangeReader instances |
+| **RangeReaderFactory** | Discovers and selects the appropriate RangeReaderProvider to create RangeReader instances |
 | **AbstractRangeReader** | Provide common functionality and validation |
 | **FileRangeReader** | Read ranges from local files using NIO |
 | **HttpRangeReader** | Read ranges from HTTP servers with authentication |
@@ -207,6 +209,39 @@ A standard `IOException` hierarchy is used, with specific exceptions for cloud p
 ## Extension Architecture
 
 New data sources can be added by extending `AbstractRangeReader` and implementing the builder pattern. New decorators can be created by implementing the `RangeReader` interface and delegating to a wrapped reader.
+
+### Service Provider Interface (SPI)
+
+The Tileverse Range Reader library leverages the Java Service Provider Interface (SPI) to enable flexible and extensible discovery of `RangeReader` implementations. Instead of directly instantiating `RangeReader` classes, the `RangeReaderFactory` uses the SPI to find and load available `RangeReaderProvider` implementations at runtime.
+
+**Key Concepts:**
+
+-   **`RangeReaderProvider`**: This interface defines the contract for a service provider. Each concrete implementation (e.g., `FileRangeReaderProvider`, `S3RangeReaderProvider`) is responsible for:
+    -   Identifying itself with a unique ID.
+    -   Declaring its availability (e.g., checking for necessary system properties or environment variables).
+    -   Specifying the URI schemes and hostname patterns it can process.
+    -   Providing a factory method to create a `RangeReader` instance based on a `RangeReaderConfig`.
+    -   Optionally, defining configuration parameters specific to its implementation.
+
+-   **`RangeReaderFactory`**: This factory class is the entry point for obtaining `RangeReader` instances. It performs the following steps:
+    1.  **Discovery**: Uses `java.util.ServiceLoader` to find all registered `RangeReaderProvider` implementations.
+    2.  **Filtering**: Filters the discovered providers based on their `canProcess(RangeReaderConfig)` method, which checks the URI scheme and other static criteria.
+    3.  **Disambiguation**: For ambiguous cases (e.g., multiple providers supporting HTTP/HTTPS), it employs a multi-step process:
+        -   Checks for explicit provider IDs in the `RangeReaderConfig`.
+        -   Analyzes URI hostname patterns to identify cloud-specific endpoints (e.g., Azure Blob Storage, AWS S3).
+        -   Performs a `HEAD` request to the resource to inspect provider-specific HTTP headers (e.g., `x-ms-request-id` for Azure, `x-amz-request-id` for S3).
+        -   Resolves remaining ambiguities by selecting the provider with the highest priority (lowest `getOrder()` value).
+    4.  **Instantiation**: Once a single best provider is identified, it delegates the creation of the `RangeReader` to that provider.
+
+**Adding a New Provider:**
+
+To add support for a new data source or protocol, you need to:
+
+1.  Implement the `RangeReaderProvider` interface.
+2.  Create a `META-INF/services/io.tileverse.rangereader.spi.RangeReaderProvider` file in your JAR, listing the fully qualified name of your `RangeReaderProvider` implementation.
+3.  Implement your specific `RangeReader` logic, typically by extending `AbstractRangeReader`.
+
+This SPI mechanism ensures that the core library remains lightweight and extensible, allowing developers to easily integrate new storage backends without modifying the core codebase.
 
 ## Testing Architecture
 
