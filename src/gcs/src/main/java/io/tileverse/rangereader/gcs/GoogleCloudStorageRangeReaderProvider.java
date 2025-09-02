@@ -15,6 +15,8 @@
  */
 package io.tileverse.rangereader.gcs;
 
+import static io.tileverse.rangereader.spi.RangeReaderParameter.SUBGROUP_AUTHENTICATION;
+
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.spi.AbstractRangeReaderProvider;
 import io.tileverse.rangereader.spi.RangeReaderConfig;
@@ -83,15 +85,14 @@ public class GoogleCloudStorageRangeReaderProvider extends AbstractRangeReaderPr
                     """
                     Project ID is a unique, user-defined identifier for a Google Cloud project.
 
-                    If no project ID is set, an attempt to obtain a default project ID from the
+                    If no project ID is set, an attempt to obtain a default project ID from the \
                     environment will be made.
 
-                    The default project ID will be obtained by the first available project ID
+                    The default project ID will be obtained by the first available project ID \
                     among the following sources:
                     1. The project ID specified by the GOOGLE_CLOUD_PROJECT environment variable
                     2. The App Engine project ID
-                    3. The project ID specified in the JSON credentials file pointed by the
-                      GOOGLE_APPLICATION_CREDENTIALS environment variable
+                    3. The project ID specified in the JSON credentials file pointed by the GOOGLE_APPLICATION_CREDENTIALS environment variable
                     4. The Google Cloud SDK project ID
                     5. The Compute Engine project ID
                     """)
@@ -126,12 +127,13 @@ public class GoogleCloudStorageRangeReaderProvider extends AbstractRangeReaderPr
                             """
                     Whether to use the default application credentials chain.
 
-                    To set up Application Default Credentials for your environment,
+                    To set up Application Default Credentials for your environment, \
                     see https://cloud.google.com/docs/authentication/external/set-up-adc
 
-                    Not doing so will lead to an error saying "Your default credentials were not found"
+                    Not doing so will lead to an error saying "Your default credentials were not found."
                     """)
                     .group(ID)
+                    .subgroup(SUBGROUP_AUTHENTICATION)
                     .type(Boolean.class)
                     .defaultValue(false)
                     .build();

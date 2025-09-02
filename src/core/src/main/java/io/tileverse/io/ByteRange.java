@@ -41,10 +41,23 @@ public record ByteRange(long offset, int length) implements Serializable, Compar
         return Long.compare(offset, o.offset());
     }
 
+    /**
+     * Creates a new {@link ByteRange} with a different offset but the same length.
+     *
+     * @param newOffset The new offset.
+     * @return A new {@link ByteRange} instance.
+     */
     public ByteRange withOffset(long newOffset) {
         return new ByteRange(newOffset, length());
     }
 
+    /**
+     * Factory method to create a new {@link ByteRange}.
+     *
+     * @param offset The starting offset.
+     * @param length The length of the range.
+     * @return A new {@link ByteRange} instance.
+     */
     public static ByteRange of(long offset, int length) {
         return new ByteRange(offset, length);
     }

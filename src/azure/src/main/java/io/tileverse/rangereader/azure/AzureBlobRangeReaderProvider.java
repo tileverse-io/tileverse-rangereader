@@ -15,6 +15,8 @@
  */
 package io.tileverse.rangereader.azure;
 
+import static io.tileverse.rangereader.spi.RangeReaderParameter.SUBGROUP_AUTHENTICATION;
+
 import com.azure.storage.blob.BlobClientBuilder;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import io.tileverse.rangereader.RangeReader;
@@ -80,13 +82,14 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
             .title("Set the blob name if the endpoint points to the account url")
             .description(
                     """
-                    Sets the blob path (e.g. /path/to/file.pmtiles)
+                    Sets the blob path (e.g. /path/to/file.pmtiles).
 
-                    If the endpoint URL is to a blob in the root container, parsing will fail as it will interpret the blob name
-                    as the container name. With only one path element, it is impossible to distinguish between a container name and
-                    a blob in the root container, so it is assumed to be the container name as this is much more common. When working
-                    with blobs in the root container, it is best to set the endpoint to the account url and specify the blob name
-                    separately using this parameter.
+                    If the endpoint URL is to a blob in the root container, parsing will fail as it will interpret the blob name \
+                    as the container name. With only one path element, it is impossible to distinguish between a container name and \
+                    a blob in the root container, so it is assumed to be the container name as this is much more common
+
+                    When working with blobs in the root container, it is best to set the endpoint to the account url and specify the \
+                    blob name separately using this parameter.
                     """)
             .type(String.class)
             .group(ID)
@@ -103,12 +106,13 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
                     """
                     The account access key used to authenticate the request.
 
-                    When specified, the account name obtained from the URI will be used with this
-                    access key to create a SharedKey credential policy that is put into a header
+                    When specified, the account name obtained from the URI will be used with this \
+                    access key to create a SharedKey credential policy that is put into a header \
                     to authorize requests
                     """)
             .type(String.class)
             .group(ID)
+            .subgroup(SUBGROUP_AUTHENTICATION)
             .build();
 
     /**
@@ -119,12 +123,14 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
             .title("SAS token to use for authenticating requests")
             .description(
                     """
-                    Shared Access Signature, a security token generated on the client side to grant limited,
+                    Shared Access Signature, a security token generated on the client side to grant limited, \
                     delegated access to Azure resources.
+
                     This token can also be in the blob URL query string.
                     """)
             .type(String.class)
             .group(ID)
+            .subgroup(SUBGROUP_AUTHENTICATION)
             .build();
 
     private static final List<RangeReaderParameter<?>> PARAMS = List.of(BLOB_NAME, ACCOUNT_KEY, SAS_TOKEN);

@@ -64,6 +64,13 @@ public interface RangeReader extends Closeable {
         return buffer;
     }
 
+    /**
+     * Reads a byte range from the source.
+     *
+     * @param range The byte range to read.
+     * @return A ByteBuffer containing the data.
+     * @throws IOException If an I/O error occurs.
+     */
     default ByteBuffer readRange(ByteRange range) throws IOException {
         return readRange(requireNonNull(range).offset(), range.length());
     }
@@ -92,6 +99,14 @@ public interface RangeReader extends Closeable {
      */
     int readRange(long offset, int length, ByteBuffer target) throws IOException;
 
+    /**
+     * Reads a byte range from the source into the provided target buffer.
+     *
+     * @param range The byte range to read.
+     * @param target The ByteBuffer to read into.
+     * @return The number of bytes read.
+     * @throws IOException If an I/O error occurs.
+     */
     default int readRange(ByteRange range, ByteBuffer target) throws IOException {
         return readRange(range.offset(), range.length(), target);
     }

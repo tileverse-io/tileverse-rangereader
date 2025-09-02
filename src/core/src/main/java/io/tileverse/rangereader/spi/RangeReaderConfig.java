@@ -53,6 +53,13 @@ public class RangeReaderConfig {
     private Map<String, Object> parameterValues = new HashMap<>();
 
     /**
+     * Creates a new, empty {@code RangeReaderConfig}.
+     */
+    public RangeReaderConfig() {
+        // Default constructor
+    }
+
+    /**
      * Returns the URI of the resource to be read.
      *
      * @return The URI.

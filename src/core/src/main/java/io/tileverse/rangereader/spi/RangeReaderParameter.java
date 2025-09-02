@@ -39,14 +39,22 @@ public record RangeReaderParameter<T>(
         String title,
         String description,
         String group,
+        Optional<String> subgroup,
         Class<T> type,
         Optional<T> defaultValue,
         List<T> sampleValues) {
+
+    public static final String GROUP_CACHING = "caching";
+    public static final String SUBGROUP_AUTHENTICATION = "authentication";
+    /**
+     * Compact constructor for {@link RangeReaderParameter} that performs validation.
+     */
     public RangeReaderParameter {
         requireNonNull(key, "Parameter key cannot be null");
         requireNonNull(title, "Parameter title cannot be null");
         requireNonNull(description, "Parameter description cannot be null");
         requireNonNull(group, "Parameter group cannot be null");
+        requireNonNull(subgroup, "Parameter subgroup cannot be null");
         requireNonNull(type, "Parameter type cannot be null");
         requireNonNull(defaultValue, "Parameter default value optional cannot be null");
         sampleValues = List.copyOf(requireNonNull(sampleValues, "Parameter sample values list cannot be null"));
@@ -69,12 +77,20 @@ public record RangeReaderParameter<T>(
         String title;
         String description;
         String group;
+        String subgroup;
 
         @SuppressWarnings("rawtypes")
         Class type;
 
         Optional<Object> defaultValue = Optional.empty(); // Initialize with empty optional
         List<Object> sampleValues = List.of();
+
+        /**
+         * Creates a new {@code Builder}.
+         */
+        public Builder() {
+            // Default constructor
+        }
 
         /**
          * Sets the unique key for the parameter.
@@ -131,6 +147,17 @@ public record RangeReaderParameter<T>(
         }
 
         /**
+         * Sets the logical sub-grouping for the parameter (e.g. "caching", "authentication").
+         *
+         * @param subgroup optional subgroup parameter
+         * @return This builder instance.
+         */
+        public Builder subgroup(String subgroup) {
+            this.subgroup = group;
+            return this;
+        }
+
+        /**
          * Sets the default value for the parameter.
          *
          * @param defaultValue The default value.
@@ -161,7 +188,8 @@ public record RangeReaderParameter<T>(
          */
         @SuppressWarnings("unchecked")
         public <T> RangeReaderParameter<T> build() {
-            return new RangeReaderParameter<>(key, title, description, group, type, defaultValue, sampleValues);
+            return new RangeReaderParameter<>(
+                    key, title, description, group, Optional.ofNullable(subgroup), type, defaultValue, sampleValues);
         }
     }
 }

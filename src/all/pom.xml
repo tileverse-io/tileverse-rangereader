@@ -12,6 +12,7 @@
   <packaging>jar</packaging>
 
   <name>Tileverse Range Reader All</name>
+  <description>Aggregator library to depend on all range reader implementations</description>
 
   <dependencies>
     <dependency>

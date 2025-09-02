@@ -410,16 +410,28 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
      */
     public static class Builder {
 
+        /**
+         * The default connection timeout for the HTTP client.
+         */
         public static final Duration DEFAULT_CONNECTION_TIMEOUT = Duration.ofSeconds(5);
 
         private URI uri;
         private boolean trustAllCertificates = false;
         private HttpAuthentication authentication = HttpAuthentication.NONE;
+        /**
+         * The connection timeout for the HTTP client.
+         */
         public Duration connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
+
         private HttpClient suppliedHttpClient;
 
         Builder() {}
 
+        /**
+         * Creates a new builder with the specified URI.
+         *
+         * @param uri The URI to read from.
+         */
         public Builder(URI uri) {
             this.uri = uri;
         }
@@ -440,6 +452,12 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
             return this;
         }
 
+        /**
+         * Sets the connection timeout for the HTTP client.
+         *
+         * @param connectionTimeout The connection timeout.
+         * @return This builder instance.
+         */
         public Builder connectionTimeout(Duration connectionTimeout) {
             this.connectionTimeout = connectionTimeout;
             return this;
@@ -517,7 +535,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
 
         /**
          * Alternative to provide a pre-configured {@link HttpClient}.
-         * @param client
+         * @param client The {@link HttpClient} to use.
          * @return this
          */
         public Builder httpClient(HttpClient client) {

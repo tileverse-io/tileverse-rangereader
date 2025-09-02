@@ -23,6 +23,10 @@ import io.tileverse.rangereader.spi.RangeReaderProvider;
 import java.io.IOException;
 import java.net.URI;
 
+/**
+ * A {@link RangeReaderProvider} for creating {@link HttpRangeReader} instances
+ * that read from a generic HTTP/HTTPS server.
+ */
 public class HttpRangeReaderProvider extends AbstractRangeReaderProvider {
 
     /**

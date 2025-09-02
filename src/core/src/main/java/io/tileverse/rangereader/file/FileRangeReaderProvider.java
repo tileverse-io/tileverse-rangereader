@@ -21,6 +21,10 @@ import io.tileverse.rangereader.spi.RangeReaderConfig;
 import io.tileverse.rangereader.spi.RangeReaderProvider;
 import java.io.IOException;
 
+/**
+ * A {@link RangeReaderProvider} for creating {@link FileRangeReader} instances
+ * that read from the local file system.
+ */
 public class FileRangeReaderProvider extends AbstractRangeReaderProvider {
 
     /**
