@@ -353,7 +353,6 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
                     // but does not provide accessors, parse accountName
                     BlobUrlParts parts = BlobUrlParts.parse(endpointUrl);
                     accountName = parts.getAccountName();
-                    parts.getHost();
                 }
             } else if (connectionString != null) {
                 if (containerName == null || blobName == null) {

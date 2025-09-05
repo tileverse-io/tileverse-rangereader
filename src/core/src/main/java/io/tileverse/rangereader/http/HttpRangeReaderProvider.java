@@ -41,6 +41,16 @@ public class HttpRangeReaderProvider extends AbstractRangeReaderProvider {
      */
     public static final String ID = "http";
 
+    /**
+     * Creates a new HttpRangeReaderProvider with support for caching parameters
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_ALIGNED
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_SIZE
+     */
+    public HttpRangeReaderProvider() {
+        super(true);
+    }
+
     @Override
     public String getId() {
         return ID;

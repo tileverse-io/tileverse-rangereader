@@ -30,6 +30,7 @@ import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -45,8 +46,8 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 public class S3RangeReader extends AbstractRangeReader implements RangeReader {
 
     private final S3Client s3Client;
-    private final String bucket;
-    private final String key;
+    private final S3Reference s3Location;
+
     private final OptionalLong contentLength;
 
     /**
@@ -57,24 +58,29 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
      * @param key The S3 object key
      * @throws IOException If an I/O error occurs
      */
-    S3RangeReader(S3Client s3Client, String bucket, String key) throws IOException {
+    S3RangeReader(S3Client s3Client, S3Reference s3Location) throws IOException {
         this.s3Client = Objects.requireNonNull(s3Client, "S3Client cannot be null");
-        this.bucket = Objects.requireNonNull(bucket, "Bucket name cannot be null");
-        this.key = Objects.requireNonNull(key, "Object key cannot be null");
+        this.s3Location = Objects.requireNonNull(s3Location, "S3Location cannot be null");
 
         // Check if the object exists and get its content length
         try {
-            HeadObjectRequest headRequest =
-                    HeadObjectRequest.builder().bucket(bucket).key(key).build();
+            HeadObjectRequest headRequest = HeadObjectRequest.builder()
+                    .bucket(s3Location.bucket())
+                    .key(s3Location.key())
+                    .build();
 
             HeadObjectResponse headResponse = s3Client.headObject(headRequest);
             Long size = headResponse.contentLength();
             this.contentLength = size == null ? OptionalLong.empty() : OptionalLong.of(size);
         } catch (NoSuchKeyException e) {
-            throw new IOException("S3 object does not exist: s3://" + bucket + "/" + key, e);
+            throw new IOException("S3 object does not exist: s3://" + s3Location, e);
         } catch (SdkException e) {
-            throw new IOException("Failed to access S3 object: " + e.getMessage(), e);
+            throw new IOException("Failed to access S3 object " + s3Location + ": " + e.getMessage(), e);
         }
+    }
+
+    S3RangeReader(S3Client client, String bucketName, String keyName) throws IOException {
+        this(client, new S3Reference(null, bucketName, keyName));
     }
 
     @Override
@@ -84,8 +90,8 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
         try {
             // Request the specified range from S3
             GetObjectRequest rangeRequest = GetObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(key)
+                    .bucket(s3Location.bucket())
+                    .key(s3Location.key())
                     .range("bytes=" + offset + "-" + rangeEnd)
                     .build();
 
@@ -117,7 +123,7 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
 
     @Override
     public String getSourceIdentifier() {
-        return "s3://" + bucket + "/" + key;
+        return s3Location.toString();
     }
 
     @Override
@@ -138,18 +144,19 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
      * Builder for S3RangeReader.
      */
     public static class Builder {
+        private S3Reference s3Location;
         private S3Client s3Client;
-        private AwsCredentialsProvider credentialsProvider;
-        private Region region;
-        private URI endpoint;
-        private boolean forcePathStyle = false;
-        private String bucket;
-        private String key;
 
+        private AwsCredentialsProvider credentialsProvider;
+        private boolean forcePathStyle;
+        private Region region;
         private String awsAccessKeyId;
         private String awsSecretAccessKey;
 
-        private Builder() {}
+        private Builder() {
+            // Initialize with empty S3Location
+            this.s3Location = new S3Reference();
+        }
 
         /**
          * Sets the AWS access key ID.
@@ -214,12 +221,17 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * @return this builder
          */
         public Builder endpoint(URI endpoint) {
-            this.endpoint = Objects.requireNonNull(endpoint, "Endpoint cannot be null");
+            Objects.requireNonNull(endpoint, "Endpoint cannot be null");
+            this.s3Location = this.s3Location.withEndpoint(endpoint);
             return this;
         }
 
         /**
          * Enables force path style for S3 client.
+         * <p>
+         * Note: When using the {@link #uri(URI)} method, path style will be automatically
+         * enabled for non-AWS S3-compatible services (such as MinIO, Google Cloud Storage, etc.)
+         * that require path-style addressing. This method allows explicit override of that behavior.
          *
          * @return this builder
          */
@@ -232,6 +244,24 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * path-style addressing (e.g., {@code https://s3.amazonaws.com/bucket/key}). When disabled, virtual-hosted-style
          * addressing will be used instead (e.g., {@code https://bucket.s3.amazonaws.com/key}). This can be useful for
          * compatibility with S3-compatible storage systems that do not support virtual-hosted-style requests.
+         * <p>
+         * <strong>Automatic Detection:</strong> When using the {@link #uri(URI)} method, path style is automatically
+         * enabled for non-AWS endpoints (detected via {@link S3Reference#requiresPathStyle()}). This method allows
+         * explicit override of the automatic detection.
+         * <p>
+         * <strong>Examples:</strong>
+         * <pre>{@code
+         * // Automatic path style detection
+         * builder.uri("http://localhost:9000/bucket/key")  // Automatically enables path style
+         *
+         * // Manual override
+         * builder.uri("http://localhost:9000/bucket/key")
+         *        .forcePathStyle(false)                    // Override automatic detection
+         *
+         * // AWS endpoints default to virtual hosted-style
+         * builder.uri("https://bucket.s3.amazonaws.com/key")  // Path style remains false
+         * }</pre>
+         *
          * @param forcePathStyle whether to enable (true) or disable path style, defaults to {@code false}
          * @return this builder
          */
@@ -247,7 +277,8 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * @return this builder
          */
         public Builder bucket(String bucket) {
-            this.bucket = Objects.requireNonNull(bucket, "Bucket cannot be null");
+            Objects.requireNonNull(bucket, "Bucket cannot be null");
+            this.s3Location = this.s3Location.withBucket(bucket);
             return this;
         }
 
@@ -258,45 +289,46 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * @return this builder
          */
         public Builder key(String key) {
-            this.key = Objects.requireNonNull(key, "Key cannot be null");
+            Objects.requireNonNull(key, "Key cannot be null");
+            this.s3Location = this.s3Location.withKey(key);
             return this;
         }
 
         /**
-         * Sets the bucket and key from an S3 URI.
+         * Sets the bucket, key, and endpoint from an S3 URI.
          *
-         * @param uri the S3 URI (s3://bucket/key)
+         * <p>Examples:
+         * <pre>{@code
+         * // AWS S3
+         * builder.uri(URI.create("s3://my-bucket/path/file.txt"));
+         * builder.uri(URI.create("https://my-bucket.s3.us-west-2.amazonaws.com/path/file.txt"));
+         *
+         * // MinIO - extracts custom endpoint and enables path-style
+         * builder.uri(URI.create("http://localhost:9000/my-bucket/path/file.txt"));
+         *
+         * // Other S3-compatible services
+         * builder.uri(URI.create("https://storage.googleapis.com/my-bucket/path/file.txt"));
+         * }</pre>
+         *
+         * @param uri the S3 URI (s3|http|https://bucket/key)
+         * @throws IllegalArgumentException if the uri scheme is not supported, or the bucket name and key can't be extracted from the URI
          * @return this builder
          */
         public Builder uri(URI uri) {
             Objects.requireNonNull(uri, "URI cannot be null");
-
-            if (!uri.getScheme().equalsIgnoreCase("s3")) {
-                throw new IllegalArgumentException("URI must have s3 scheme: " + uri);
-            }
-
-            String bucketName = uri.getAuthority();
-            if (bucketName == null || bucketName.isEmpty()) {
-                throw new IllegalArgumentException("S3 URI must have a bucket: " + uri);
-            }
-
-            String pathStr = uri.getPath();
-            if (pathStr == null || pathStr.isEmpty() || pathStr.equals("/")) {
-                throw new IllegalArgumentException("S3 URI must have a key: " + uri);
-            }
-
-            // Remove leading slash from path to get the key
-            String objectKey = pathStr.startsWith("/") ? pathStr.substring(1) : pathStr;
-
-            this.bucket = bucketName;
-            this.key = objectKey;
-
-            // Extract region from fragment if present
-            if (uri.getFragment() != null && !uri.getFragment().isEmpty()) {
-                this.region = Region.of(uri.getFragment());
-            }
-
+            this.s3Location = S3CompatibleUrlParser.parseS3Url(uri);
             return this;
+        }
+
+        /**
+         * Sets the bucket, key, and endpoint from an S3 URL string.
+         *
+         * @param uri the S3 URL string
+         * @return this builder
+         * @see #uri(URI)
+         */
+        public Builder uri(String uri) {
+            return uri(URI.create(uri));
         }
 
         /**
@@ -306,41 +338,41 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * @throws IOException if an error occurs during construction
          */
         public S3RangeReader build() throws IOException {
-            if (bucket == null || key == null) {
+            if (s3Location.bucket() == null || s3Location.key() == null) {
                 throw new IllegalStateException("Bucket and key must be set");
             }
 
             S3Client client = s3Client;
             if (client == null) {
                 // Build S3 client
-                var builder = S3Client.builder();
+                S3ClientBuilder clientBuilder = S3Client.builder();
 
                 if (credentialsProvider != null) {
-                    builder.credentialsProvider(credentialsProvider);
+                    clientBuilder.credentialsProvider(credentialsProvider);
                 } else if (awsAccessKeyId != null && awsSecretAccessKey != null) {
-                    builder.credentialsProvider(StaticCredentialsProvider.create(
+                    clientBuilder.credentialsProvider(StaticCredentialsProvider.create(
                             AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey)));
                 } else {
-                    builder.credentialsProvider(
+                    clientBuilder.credentialsProvider(
                             DefaultCredentialsProvider.builder().build());
                 }
 
                 if (region != null) {
-                    builder.region(region);
+                    clientBuilder.region(region);
                 }
 
-                if (endpoint != null) {
-                    builder.endpointOverride(endpoint);
+                if (s3Location.endpoint() != null) {
+                    clientBuilder.endpointOverride(s3Location.endpoint());
                 }
 
-                if (forcePathStyle) {
-                    builder.forcePathStyle(true);
+                if (s3Location.requiresPathStyle() || forcePathStyle) {
+                    clientBuilder.forcePathStyle(true);
                 }
 
-                client = builder.build();
+                client = clientBuilder.build();
             }
 
-            return new S3RangeReader(client, bucket, key);
+            return new S3RangeReader(client, s3Location);
         }
     }
 }

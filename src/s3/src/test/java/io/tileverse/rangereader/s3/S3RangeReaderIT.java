@@ -105,7 +105,11 @@ public class S3RangeReaderIT extends AbstractRangeReaderIT {
                 .forcePathStyle(true)
                 .build();
 
-        return new S3RangeReader(client, BUCKET_NAME, KEY_NAME);
+        return S3RangeReader.builder()
+                .s3Client(client)
+                .bucket(BUCKET_NAME)
+                .key(KEY_NAME)
+                .build();
     }
 
     /**

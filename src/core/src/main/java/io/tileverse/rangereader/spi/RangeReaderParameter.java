@@ -29,7 +29,8 @@ import java.util.Optional;
  * @param key The unique key identifying the parameter.
  * @param title A human-readable title of the parameter.
  * @param description A human-readable description of the parameter.
- * @param group A logical grouping for the parameter (e.g., "memory-cache").
+ * @param group A logical grouping for the parameter (e.g., "caching", "s3", "gcs", etc.).
+ * @param subgroup An optional logical sub group for the parameter (e.g., "authentication", "advanced", etc.).
  * @param type The {@link Class} representing the type of the parameter's value.
  * @param defaultValue An {@link Optional} containing the default value of the parameter, if any.
  * @param sampleValues A list of sample or suggested values for the parameter.
@@ -46,6 +47,7 @@ public record RangeReaderParameter<T>(
 
     public static final String GROUP_CACHING = "caching";
     public static final String SUBGROUP_AUTHENTICATION = "authentication";
+
     /**
      * Compact constructor for {@link RangeReaderParameter} that performs validation.
      */

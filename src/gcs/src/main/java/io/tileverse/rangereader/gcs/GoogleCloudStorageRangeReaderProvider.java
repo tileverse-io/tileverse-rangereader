@@ -69,7 +69,10 @@ public class GoogleCloudStorageRangeReaderProvider extends AbstractRangeReaderPr
     public static final String ID = "gcs";
 
     /**
-     * Create a new GoogleCloudStorageRangeReaderProvider with support for caching decorator
+     * Creates a new GoogleCloudStorageRangeReaderProvider with support for caching parameters
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_ALIGNED
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_SIZE
      */
     public GoogleCloudStorageRangeReaderProvider() {
         super(true);

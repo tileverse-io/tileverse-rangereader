@@ -16,6 +16,7 @@
 package io.tileverse.rangereader.s3;
 
 import static io.tileverse.rangereader.spi.RangeReaderParameter.SUBGROUP_AUTHENTICATION;
+import static java.util.function.Predicate.not;
 
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.s3.S3RangeReader.Builder;
@@ -27,6 +28,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.regions.Region;
 
 /**
  * {@link RangeReaderProvider} implementation for AWS S3.
@@ -37,6 +41,7 @@ import java.util.Map;
  * address used to access resources stored within AWS S3. There
  * are several forms of S3 URLs, depending on the context and desired access
  * method:
+ * <h2> Path-Style URLs</h2>
  *
  * <ul>
  * <li>{@code s3://} URI: This is the canonical URI format for referencing
@@ -57,6 +62,8 @@ import java.util.Map;
  */
 public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
 
+    private static final Logger logger = LoggerFactory.getLogger(S3RangeReaderProvider.class);
+
     /**
      * Key used as environment variable name to disable this range reader provider
      * <pre>
@@ -70,7 +77,10 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
     public static final String ID = "s3";
 
     /**
-     * Create a new S3RangeReaderProvider with support for caching decorator
+     * Creates a new S3RangeReaderProvider with support for caching parameters
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_ALIGNED
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_SIZE
      */
     public S3RangeReaderProvider() {
         super(true);
@@ -87,17 +97,51 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
             .title("Enable S3 path style access")
             .description(
                     """
-                    When enabled, requests will use path-style addressing (e.g., https://s3.amazonaws.com/bucket/key).
+                When enabled, requests will use path-style addressing (e.g., https://s3.amazonaws.com/bucket/key).
 
-                    When disabled, virtual-hosted-style addressing will be used instead \
-                    (e.g., https://bucket.s3.amazonaws.com/key).
+                When disabled, virtual-hosted-style addressing will be used instead \
+                (e.g., https://bucket.s3.amazonaws.com/key).
 
-                    This can be useful for compatibility with S3-compatible storage systems that do not \
-                    support virtual-hosted-style requests.
-                    """)
+                This can be useful for compatibility with S3-compatible storage systems that do not \
+                support virtual-hosted-style requests.
+
+                Note: When a complete S3 URL is provided, path style is automatically detected and enabled \
+                for non-AWS endpoints (MinIO, Google Cloud Storage, etc.). This parameter allows explicit \
+                override of the automatic detection behavior.
+                """)
             .type(Boolean.class)
             .group(ID)
             .defaultValue(true)
+            .build();
+
+    public static final RangeReaderParameter<String> REGION = RangeReaderParameter.builder()
+            .key("io.tileverse.rangereader.s3.region")
+            .title("Region")
+            .description(
+                    """
+                    Configure the region with which the SDK should communicate.
+
+                    If this is not specified, the SDK will attempt to identify the endpoint automatically using the following logic:
+
+                    * Check the 'aws.region' system property for the region.
+                    * Check the 'AWS_REGION' environment variable for the region.
+                    * Check the {user.home}/.aws/credentials and {user.home}/.aws/config files for the region.
+                    * If running in EC2, check the EC2 metadata service for the region.
+
+                    If the region is not found, an exception will be thrown.
+
+                    Each AWS region corresponds to a separate geographical location where a set of Amazon services is deployed. These \
+                    regions (except for the special `aws-global` and `aws-cn-global` regions) are separate from each other, \
+                    with their own set of resources. This means a resource created in one region (eg. an SQS queue) is not available in \
+                    another region.
+                    """)
+            .type(String.class)
+            .group(ID)
+            // filter out global regions as of Region.of(String)
+            .options(Region.regions().stream()
+                    .filter(not(Region::isGlobalRegion))
+                    .map(Region::id)
+                    .toArray())
             .build();
 
     /**
@@ -168,8 +212,8 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
             .subgroup(SUBGROUP_AUTHENTICATION)
             .build();
 
-    private static final List<RangeReaderParameter<?>> PARAMS =
-            List.of(FORCE_PATH_STYLE, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY);
+    static final List<RangeReaderParameter<?>> PARAMS =
+            List.of(FORCE_PATH_STYLE, REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY);
 
     @Override
     public String getId() {
@@ -198,44 +242,34 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
 
     @Override
     protected RangeReader createInternal(RangeReaderConfig opts) throws IOException {
+        Builder builder = prepareRangeReaderBuilder(opts);
+        return builder.build();
+    }
+
+    Builder prepareRangeReaderBuilder(RangeReaderConfig opts) {
         URI uri = opts.uri();
         Builder builder = S3RangeReader.builder().uri(uri);
         opts.getParameter(FORCE_PATH_STYLE).ifPresent(builder::forcePathStyle);
+        opts.getParameter(REGION).map(Region::of).ifPresent(builder::region);
         opts.getParameter(AWS_ACCESS_KEY_ID).ifPresent(builder::awsAccessKeyId);
         opts.getParameter(AWS_SECRET_ACCESS_KEY).ifPresent(builder::awsSecretAccessKey);
-        return builder.build();
+        return builder;
     }
 
     @Override
     public boolean canProcess(RangeReaderConfig config) {
-        if (!RangeReaderConfig.matches(config, getId(), "s3", "http", "https")) {
-            return false;
-        }
-
-        URI uri = config.uri();
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        String query = uri.getQuery();
-
-        if ("s3".equalsIgnoreCase(scheme)) {
-            return true;
-        }
-
-        if (host != null) {
-            if (host.endsWith(".s3.amazonaws.com")
-                    || host.endsWith(".s3-accesspoint.amazonaws.com")
-                    || host.endsWith(".s3-accelerate.amazonaws.com")) {
-                return true;
+        if (RangeReaderConfig.matches(config, getId(), "s3", "http", "https")) {
+            try {
+                S3Reference l = S3CompatibleUrlParser.parseS3Url(config.uri());
+                boolean requiresPathStyle = l.requiresPathStyle();
+                if (requiresPathStyle) {
+                    return l.endpoint() != null && l.bucket() != null && l.key() != null;
+                }
+                return l.bucket() != null && l.key() != null;
+            } catch (IllegalArgumentException e) {
+                logger.debug("Can't process URL {}", config.uri());
             }
         }
-
-        // Check for pre-signed URL parameters
-        if (query != null) {
-            return query.toUpperCase().contains("X-AMZ-ALGORITHM=")
-                    && query.contains("X-AMZ-CREDENTIAL=")
-                    && query.contains("X-AMZ-SIGNATURE=");
-        }
-
         return false;
     }
 

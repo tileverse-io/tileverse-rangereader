@@ -122,7 +122,11 @@ class S3RangeReaderTest {
         });
 
         // Create the reader
-        reader = new S3RangeReader(s3Client, BUCKET, KEY);
+        reader = S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket(BUCKET)
+                .key(KEY)
+                .build();
     }
 
     @Test
@@ -221,7 +225,11 @@ class S3RangeReaderTest {
                         .message("Key does not exist")
                         .build());
 
-        assertThrows(IOException.class, () -> new S3RangeReader(s3Client, BUCKET, KEY));
+        assertThrows(IOException.class, () -> S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket(BUCKET)
+                .key(KEY)
+                .build());
     }
 
     @Test
@@ -230,7 +238,11 @@ class S3RangeReaderTest {
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenThrow(SdkException.builder().message("S3 error").build());
 
-        assertThrows(IOException.class, () -> new S3RangeReader(s3Client, BUCKET, KEY));
+        assertThrows(IOException.class, () -> S3RangeReader.builder()
+                .s3Client(s3Client)
+                .bucket(BUCKET)
+                .key(KEY)
+                .build());
     }
 
     @Test

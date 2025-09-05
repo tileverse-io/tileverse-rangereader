@@ -18,6 +18,7 @@ package io.tileverse.rangereader.spi;
 import static java.util.Objects.requireNonNull;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +36,27 @@ public class RangeReaderConfig {
      * The key used in {@link Properties} to specify the URI of the resource.
      */
     public static final String URI_KEY = "io.tileverse.rangereader.uri";
+
     /**
      * The key used in {@link Properties} to specify the ID of a {@link RangeReaderProvider}.
      * This can be used to force the use of a specific provider when URI-based disambiguation is not sufficient.
      */
     public static final String PROVIDER_ID_KEY = "io.tileverse.rangereader.provider";
+
+    /**
+     * A parameter that can be used by client code to force a given {@link #providerId(String) provider id}
+     * using {@link #setParameter(RangeReaderParameter, Object)} or {@link #setParameter(String, Object)}
+     */
+    public static final RangeReaderParameter<String> FORCE_PROVIDER_ID = RangeReaderParameter.builder()
+            .key(PROVIDER_ID_KEY)
+            .title("Select range reader implementation")
+            .description("")
+            .type(String.class)
+            .options(RangeReaderProvider.getAvailableProviders().stream()
+                    .map(RangeReaderProvider::getId)
+                    .toArray())
+            .group("advanced")
+            .build();
 
     private URI uri;
 
@@ -66,6 +83,18 @@ public class RangeReaderConfig {
      */
     public URI uri() {
         return uri;
+    }
+
+    /**
+     * Sets the URI of the resource to be read.
+     *
+     * @param uri The URI to set.
+     * @return This {@code RangeReaderConfig} instance for method chaining.
+     * @throws NullPointerException if the provided URI is {@code null}.
+     * @throws  IllegalArgumentException If the given string violates RFC&nbsp;2396
+     */
+    public RangeReaderConfig uri(String uri) {
+        return uri(URI.create(uri));
     }
 
     /**
@@ -102,6 +131,10 @@ public class RangeReaderConfig {
 
     /**
      * Sets a generic parameter value by its key.
+     * <p>
+     * {@link #providerId(String) enforcing a provider id} can also be done by calling this method
+     * with {@link #FORCE_PROVIDER_ID FORCE_PROVIDER_ID.key()}
+     * <p>
      * Note: This method does not validate the parameter against any known {@link RangeReaderParameter}s.
      *
      * @param key The key of the parameter.
@@ -109,7 +142,27 @@ public class RangeReaderConfig {
      * @return This {@code RangeReaderConfig} instance for method chaining.
      */
     public RangeReaderConfig setParameter(String key, Object value) {
+        if (FORCE_PROVIDER_ID.key().equals(key)) {
+            this.providerId = value == null ? null : String.valueOf(value);
+        }
         this.parameterValues.put(requireNonNull(key, "key"), value);
+        return this;
+    }
+
+    /**
+     * Sets a generic parameter value by its key.
+     * <p>
+     * {@link #providerId(String) enforcing a provider id} can also be done by calling this method
+     * with {@link #FORCE_PROVIDER_ID}
+     * <p>
+     * Note: This method does not validate the parameter against any known {@link RangeReaderParameter}s.
+     *
+     * @param param The parameter descriptor.
+     * @param value The value of the parameter.
+     * @return This {@code RangeReaderConfig} instance for method chaining.
+     */
+    public <T> RangeReaderConfig setParameter(RangeReaderParameter<T> param, T value) {
+        setParameter(param.key(), value);
         return this;
     }
 
@@ -257,20 +310,13 @@ public class RangeReaderConfig {
     public static boolean matches(RangeReaderConfig config, String providerId, String... acceptedUriSchemes) {
         requireNonNull(config, "config parameter is null");
         requireNonNull(providerId, "providerId parameter is null");
+        requireNonNull(config.uri(), "config uri is null");
         if (config.providerId().isPresent()
                 && !config.providerId().orElseThrow().equals(providerId)) {
             return false;
         }
         // may be null
         final String scheme = config.uri().getScheme();
-        if (acceptedUriSchemes == null) {
-            return scheme == null;
-        }
-        for (String accepts : acceptedUriSchemes) {
-            if ((accepts == null && scheme == null) || accepts.equals(scheme)) {
-                return true;
-            }
-        }
-        return false;
+        return Arrays.asList(acceptedUriSchemes).contains(scheme);
     }
 }

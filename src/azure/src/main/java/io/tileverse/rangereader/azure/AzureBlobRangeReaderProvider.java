@@ -18,6 +18,7 @@ package io.tileverse.rangereader.azure;
 import static io.tileverse.rangereader.spi.RangeReaderParameter.SUBGROUP_AUTHENTICATION;
 
 import com.azure.storage.blob.BlobClientBuilder;
+import com.azure.storage.blob.BlobUrlParts;
 import com.azure.storage.common.StorageSharedKeyCredential;
 import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.azure.AzureBlobRangeReader.Builder;
@@ -66,7 +67,10 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
     public static final String ID = "azure";
 
     /**
-     * Create a new AzureBlobRangeReaderProvider with support for caching decorator
+     * Creates a new AzureBlobRangeReaderProvider with support for caching parameters
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_ALIGNED
+     * @see AbstractRangeReaderProvider#MEMORY_CACHE_BLOCK_SIZE
      */
     public AzureBlobRangeReaderProvider() {
         super(true);
@@ -165,9 +169,21 @@ public class AzureBlobRangeReaderProvider extends AbstractRangeReaderProvider {
         if (!RangeReaderConfig.matches(config, getId(), "http", "https")) {
             return false;
         }
-        URI uri = config.uri();
-        String host = uri.getHost();
-        return host != null && host.endsWith(".blob.core.windows.net");
+        URI endpointUrl = config.uri();
+        BlobUrlParts parts;
+        try {
+            parts = BlobUrlParts.parse(endpointUrl.toString());
+        } catch (Exception e) {
+            return false;
+        }
+        if (parts.getHost() == null || parts.getBlobContainerName() == null) {
+            return false;
+        }
+        String blobName = parts.getBlobName();
+        if (blobName == null) {
+            return config.getParameter(BLOB_NAME).isPresent();
+        }
+        return true;
     }
 
     @Override
