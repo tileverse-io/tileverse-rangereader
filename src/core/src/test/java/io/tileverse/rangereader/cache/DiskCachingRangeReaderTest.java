@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.OptionalLong;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -46,7 +47,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Tests for {@link DiskCachingRangeReader}.
  */
 @Disabled("random failures in github actions, revisit")
-public class DiskCachingRangeReaderTest {
+class DiskCachingRangeReaderTest {
 
     @TempDir
     Path tempDir;
@@ -673,7 +674,7 @@ public class DiskCachingRangeReaderTest {
             }
 
             @Override
-            public long size() throws IOException {
+            public OptionalLong size() throws IOException {
                 return baseReader.size();
             }
 
@@ -794,7 +795,7 @@ public class DiskCachingRangeReaderTest {
             }
 
             @Override
-            public long size() throws IOException {
+            public OptionalLong size() throws IOException {
                 return baseReader.size();
             }
 
@@ -1122,8 +1123,8 @@ public class DiskCachingRangeReaderTest {
             }
 
             @Override
-            public long size() throws IOException {
-                return Long.MAX_VALUE; // Very large file
+            public OptionalLong size() throws IOException {
+                return OptionalLong.of(Long.MAX_VALUE); // Very large file
             }
 
             @Override

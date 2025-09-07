@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -45,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Tests for {@link CachingRangeReader}.
  */
-public class CachingRangeReaderTest {
+class CachingRangeReaderTest {
 
     @TempDir
     Path tempDir;
@@ -240,7 +241,7 @@ public class CachingRangeReaderTest {
         try (CachingRangeReader reader = CachingRangeReader.builder(delegate).build()) {
 
             // Read near end of file where we might get fewer bytes than requested
-            long fileSize = reader.size();
+            long fileSize = reader.size().orElseThrow();
             int requestedBytes = 1000;
             long offset = fileSize - 500; // Request more bytes than available
 
@@ -259,7 +260,7 @@ public class CachingRangeReaderTest {
     void testSizeMethod() throws IOException {
         RangeReader delegate = FileRangeReader.builder().path(testFile).build();
         try (CachingRangeReader reader = CachingRangeReader.builder(delegate).build()) {
-            assertEquals(FILE_SIZE, reader.size(), "Size should match file size");
+            assertEquals(FILE_SIZE, reader.size().getAsLong(), "Size should match file size");
         }
     }
 
@@ -479,7 +480,7 @@ public class CachingRangeReaderTest {
         }
 
         @Override
-        public long size() throws IOException {
+        public OptionalLong size() throws IOException {
             return delegate.size();
         }
 
@@ -518,8 +519,8 @@ public class CachingRangeReaderTest {
         }
 
         @Override
-        public long size() throws IOException {
-            return 1000;
+        public OptionalLong size() throws IOException {
+            return OptionalLong.of(1000);
         }
 
         @Override

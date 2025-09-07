@@ -32,7 +32,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Tests for {@link CacheStats} and consistent cache statistics APIs.
  */
-public class CacheStatsTest {
+class CacheStatsTest {
 
     @TempDir
     Path tempDir;

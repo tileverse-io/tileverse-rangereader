@@ -41,7 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
  * method correctly returns the number of bytes read and leaves the target buffer in a readable
  * state without requiring the caller to flip it.
  */
-public class RangeReaderBufferTest {
+class RangeReaderBufferTest {
 
     @TempDir
     Path tempDir;

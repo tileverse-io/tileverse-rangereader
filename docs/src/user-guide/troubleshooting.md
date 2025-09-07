@@ -184,27 +184,18 @@ export JAVA_HOME=/path/to/java17
 
 **Solutions**:
 
-1. **Add block alignment**:
-   ```java
-   var reader = BlockAlignedRangeReader.builder()
-       .delegate(baseReader)
-       .blockSize(1024 * 1024)  // 1MB blocks for cloud storage
-       .build();
-   ```
-
-2. **Enable caching**:
+1. **Enable caching**:
    ```java
    var reader = CachingRangeReader.builder(baseReader)
        .maximumSize(1000)
        .build();
    ```
 
-3. **Use larger block sizes for cloud storage**:
+2. **Use disk caching for persistent storage**:
    ```java
-   // For S3/Azure/GCS, use 1MB+ blocks
-   var reader = BlockAlignedRangeReader.builder()
-       .delegate(cloudReader)
-       .blockSize(4 * 1024 * 1024)  // 4MB
+   // For large datasets, use disk caching
+   var reader = DiskCachingRangeReader.builder(cloudReader)
+       .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB cache
        .build();
    ```
 
@@ -263,15 +254,18 @@ export JAVA_HOME=/path/to/java17
    reader.readRange(1500, 300);
    ```
 
-3. **Use appropriate cache keys**:
+3. **Use appropriate read patterns**:
    ```java
-   // Ensure block alignment to improve cache hits
-   var reader = BlockAlignedRangeReader.builder()
-       .delegate(CachingRangeReader.builder(baseReader)
-           .maximumSize(1000)
-           .build())
-       .blockSize(64 * 1024)
+   // Ensure consistent read patterns to improve cache hits
+   var reader = CachingRangeReader.builder(baseReader)
+       .maximumSize(1000)
        .build();
+   
+   // Read in consistent chunks
+   int chunkSize = 64 * 1024;  // 64KB chunks
+   for (int i = 0; i < 10; i++) {
+       reader.readRange(i * chunkSize, chunkSize);  // Cache-friendly
+   }
    ```
 
 ## Network Issues

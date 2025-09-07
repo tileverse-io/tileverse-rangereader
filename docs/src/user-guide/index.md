@@ -153,22 +153,20 @@ CachingRangeReader (memory cache - outermost)
     ↓  
 DiskCachingRangeReader (persistent cache)
     ↓
-BlockAlignedRangeReader (read optimization)
-    ↓
 BaseReader (S3, Azure, HTTP, etc.)
     ↓
 Data Source
 ```
 
-### Block Size Guidelines
+### Read Pattern Guidelines
 
-| Data Source | Recommended Block Size | Rationale |
-|-------------|------------------------|-----------|
-| **Local Files** | 64 KB - 1 MB | Balance between I/O efficiency and memory usage |
-| **HTTP** | 256 KB - 1 MB | Reduce request overhead |
-| **S3** | 1 MB - 8 MB | Minimize API calls, optimize for S3's performance characteristics |
-| **Azure Blob** | 1 MB - 4 MB | Balance throughput and latency |
-| **Google Cloud** | 1 MB - 8 MB | Optimize for GCS performance |
+| Data Source | Recommended Strategy | Rationale |
+|-------------|----------------------|-----------|
+| **Local Files** | Direct access | OS already provides efficient file caching |
+| **HTTP** | Chunked reading (256 KB - 1 MB) | Reduce request overhead |
+| **S3** | Large chunks (1 MB - 8 MB) | Minimize API calls, optimize for S3's performance characteristics |
+| **Azure Blob** | Large chunks (1 MB - 4 MB) | Balance throughput and latency |
+| **Google Cloud** | Large chunks (1 MB - 8 MB) | Optimize for GCS performance |
 
 ### Memory Management
 

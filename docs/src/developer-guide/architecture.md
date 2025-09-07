@@ -64,7 +64,7 @@ graph TD
 - Abstract base classes with common functionality
 - Local file system implementation (`FileRangeReader`)
 - HTTP/HTTPS implementation (`HttpRangeReader`)
-- Performance decorators (caching, block alignment, disk caching)
+- Performance decorators (caching, disk caching)
 - Authentication framework for HTTP sources
 
 ### Cloud Provider Modules (`s3`, `azure`, `gcs`)
@@ -86,9 +86,11 @@ graph TD
 
 ### Component Responsibilities
 
-| Component | Responsibility | 
+| Component | Responsibility |
 |-----------|---------------|
 | **RangeReader** | Define the contract for reading byte ranges |
+| **RangeReaderProvider** | Service Provider Interface for discovering and creating RangeReader instances |
+| **RangeReaderFactory** | Discovers and selects the appropriate RangeReaderProvider to create RangeReader instances |
 | **AbstractRangeReader** | Provide common functionality and validation |
 | **FileRangeReader** | Read ranges from local files using NIO |
 | **HttpRangeReader** | Read ranges from HTTP servers with authentication |
@@ -97,7 +99,6 @@ graph TD
 | **GoogleCloudStorageRangeReader** | Read ranges from Google Cloud Storage |
 | **CachingRangeReader** | Provide in-memory caching with configurable policies |
 | **DiskCachingRangeReader** | Provide persistent disk-based caching |
-| **BlockAlignedRangeReader** | Optimize reads through block alignment |
 
 ## Core Design Patterns
 
@@ -108,21 +109,16 @@ The library is built on proven architectural patterns that provide flexibility, 
 The primary architectural pattern enabling composable functionality:
 
 ```java
-// ⚠️ CRITICAL: Decorator order matters for optimal performance!
-// BlockAlignedRangeReader must ALWAYS wrap caching decorators
+// ✅ CORRECT: Proper decorator stacking order
 RangeReader reader = 
-    BlockAlignedRangeReader.builder()          // ← Outermost: aligns requests  
-        .delegate(CachingRangeReader.builder(   // ← Memory caching (non-overlapping)
-            BlockAlignedRangeReader.builder()   // ← Aligns for disk cache
-                .delegate(DiskCachingRangeReader.builder(  // ← Persistent caching
-                    S3RangeReader.builder()     // ← Base implementation
-                        .uri(uri)
-                        .build())
-                    .build())
-                .blockSize(1024 * 1024)         // ← 1MB blocks for disk
+    CachingRangeReader.builder(             // ← Outermost: memory caching
+        DiskCachingRangeReader.builder(     // ← Persistent caching
+            S3RangeReader.builder()         // ← Base implementation
+                .uri(uri)
                 .build())
+            .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB disk cache
             .build())
-        .blockSize(64 * 1024)                   // ← 64KB blocks for memory
+        .maximumSize(1000)                  // 1000 entries in memory
         .build();
 ```
 
@@ -202,9 +198,9 @@ All `RangeReader` implementations MUST be thread-safe. This is achieved through:
 - **L2 (Disk)**: Persistent, larger capacity.
 - **L3 (Network/Disk)**: Authoritative source.
 
-### Block Alignment
+### Read Optimization
 
-Block alignment reduces the number of requests for sequential reads by fetching a larger block and serving subsequent requests from the cached block.
+The library optimizes read patterns through intelligent caching strategies. Memory caching provides fast access to frequently used ranges, while disk caching offers persistence for large datasets across application sessions.
 
 ## Error Handling Architecture
 
@@ -213,6 +209,39 @@ A standard `IOException` hierarchy is used, with specific exceptions for cloud p
 ## Extension Architecture
 
 New data sources can be added by extending `AbstractRangeReader` and implementing the builder pattern. New decorators can be created by implementing the `RangeReader` interface and delegating to a wrapped reader.
+
+### Service Provider Interface (SPI)
+
+The Tileverse Range Reader library leverages the Java Service Provider Interface (SPI) to enable flexible and extensible discovery of `RangeReader` implementations. Instead of directly instantiating `RangeReader` classes, the `RangeReaderFactory` uses the SPI to find and load available `RangeReaderProvider` implementations at runtime.
+
+**Key Concepts:**
+
+-   **`RangeReaderProvider`**: This interface defines the contract for a service provider. Each concrete implementation (e.g., `FileRangeReaderProvider`, `S3RangeReaderProvider`) is responsible for:
+    -   Identifying itself with a unique ID.
+    -   Declaring its availability (e.g., checking for necessary system properties or environment variables).
+    -   Specifying the URI schemes and hostname patterns it can process.
+    -   Providing a factory method to create a `RangeReader` instance based on a `RangeReaderConfig`.
+    -   Optionally, defining configuration parameters specific to its implementation.
+
+-   **`RangeReaderFactory`**: This factory class is the entry point for obtaining `RangeReader` instances. It performs the following steps:
+    1.  **Discovery**: Uses `java.util.ServiceLoader` to find all registered `RangeReaderProvider` implementations.
+    2.  **Filtering**: Filters the discovered providers based on their `canProcess(RangeReaderConfig)` method, which checks the URI scheme and other static criteria.
+    3.  **Disambiguation**: For ambiguous cases (e.g., multiple providers supporting HTTP/HTTPS), it employs a multi-step process:
+        -   Checks for explicit provider IDs in the `RangeReaderConfig`.
+        -   Analyzes URI hostname patterns to identify cloud-specific endpoints (e.g., Azure Blob Storage, AWS S3).
+        -   Performs a `HEAD` request to the resource to inspect provider-specific HTTP headers (e.g., `x-ms-request-id` for Azure, `x-amz-request-id` for S3).
+        -   Resolves remaining ambiguities by selecting the provider with the highest priority (lowest `getOrder()` value).
+    4.  **Instantiation**: Once a single best provider is identified, it delegates the creation of the `RangeReader` to that provider.
+
+**Adding a New Provider:**
+
+To add support for a new data source or protocol, you need to:
+
+1.  Implement the `RangeReaderProvider` interface.
+2.  Create a `META-INF/services/io.tileverse.rangereader.spi.RangeReaderProvider` file in your JAR, listing the fully qualified name of your `RangeReaderProvider` implementation.
+3.  Implement your specific `RangeReader` logic, typically by extending `AbstractRangeReader`.
+
+This SPI mechanism ensures that the core library remains lightweight and extensible, allowing developers to easily integrate new storage backends without modifying the core codebase.
 
 ## Testing Architecture
 

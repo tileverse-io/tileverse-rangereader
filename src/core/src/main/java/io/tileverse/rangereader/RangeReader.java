@@ -15,6 +15,8 @@
  */
 package io.tileverse.rangereader;
 
+import static java.util.Objects.requireNonNull;
+
 import io.tileverse.io.ByteBufferPool;
 import io.tileverse.io.ByteRange;
 import io.tileverse.io.SeekableByteChannelImageInputStream;
@@ -23,6 +25,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.util.OptionalLong;
 import javax.imageio.stream.ImageInputStream;
 
 /**
@@ -62,6 +65,17 @@ public interface RangeReader extends Closeable {
     }
 
     /**
+     * Reads a byte range from the source.
+     *
+     * @param range The byte range to read.
+     * @return A ByteBuffer containing the data.
+     * @throws IOException If an I/O error occurs.
+     */
+    default ByteBuffer readRange(ByteRange range) throws IOException {
+        return readRange(requireNonNull(range).offset(), range.length());
+    }
+
+    /**
      * Reads bytes from the source at the specified offset into the provided target
      * buffer.
      * <p>
@@ -85,6 +99,14 @@ public interface RangeReader extends Closeable {
      */
     int readRange(long offset, int length, ByteBuffer target) throws IOException;
 
+    /**
+     * Reads a byte range from the source into the provided target buffer.
+     *
+     * @param range The byte range to read.
+     * @param target The ByteBuffer to read into.
+     * @return The number of bytes read.
+     * @throws IOException If an I/O error occurs.
+     */
     default int readRange(ByteRange range, ByteBuffer target) throws IOException {
         return readRange(range.offset(), range.length(), target);
     }
@@ -94,10 +116,10 @@ public interface RangeReader extends Closeable {
      * <p>
      * Implementations MUST ensure this method is thread-safe.
      *
-     * @return The size in bytes
+     * @return The size in bytes, or empty if unknown
      * @throws IOException If an I/O error occurs
      */
-    long size() throws IOException;
+    OptionalLong size() throws IOException;
 
     /**
      * Gets a unique identifier for the source being read.

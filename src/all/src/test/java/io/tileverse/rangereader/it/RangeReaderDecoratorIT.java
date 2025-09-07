@@ -38,7 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
  * These tests verify the behavior of the BlockAlignedRangeReader and
  * CachingRangeReader implementations, as well as their combined usage.
  */
-public class RangeReaderDecoratorIT {
+class RangeReaderDecoratorIT {
 
     private static final int FILE_SIZE = 128 * 1024; // 128KB test file
     private static final int DEFAULT_BLOCK_SIZE = 4096; // 4KB blocks

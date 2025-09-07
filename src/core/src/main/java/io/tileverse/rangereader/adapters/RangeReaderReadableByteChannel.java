@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -110,25 +111,25 @@ public class RangeReaderReadableByteChannel implements ReadableByteChannel {
             return 0;
         }
 
-        long sourceSize = rangeReader.size();
-        long currentPosition = position.get();
+        final long currentPosition = position.get();
+        final OptionalLong sourceSize = rangeReader.size();
 
         // Check if we're at or beyond the end of the source
-        if (currentPosition >= sourceSize) {
+        if (sourceSize.isPresent() && currentPosition >= sourceSize.getAsLong()) {
             return -1;
         }
 
         // Calculate how many bytes we can actually read
-        int requestedBytes = dst.remaining();
-        long availableBytes = sourceSize - currentPosition;
-        int bytesToRead = (int) Math.min(requestedBytes, availableBytes);
+        final int requestedBytes = dst.remaining();
+        final long availableBytes = sourceSize.isEmpty() ? requestedBytes : (sourceSize.getAsLong() - currentPosition);
+        final int bytesToRead = (int) Math.min(requestedBytes, availableBytes);
 
         if (bytesToRead <= 0) {
             return -1;
         }
 
         // Read from the RangeReader
-        int bytesRead = rangeReader.readRange(currentPosition, bytesToRead, dst);
+        final int bytesRead = rangeReader.readRange(currentPosition, bytesToRead, dst);
 
         // Advance the position
         position.addAndGet(bytesRead);
@@ -152,13 +153,14 @@ public class RangeReaderReadableByteChannel implements ReadableByteChannel {
     /**
      * Returns the size of the underlying source from the RangeReader.
      *
-     * @return the size of the source in bytes
+     * @return the size of the source in bytes, or {@code -1} if uknown
      * @throws ClosedChannelException if this channel is closed
      * @throws IOException if an I/O error occurs
      */
     public long size() throws IOException {
         ensureOpen();
-        return rangeReader.size();
+        OptionalLong size = rangeReader.size();
+        return size.isPresent() ? size.getAsLong() : -1L;
     }
 
     /**
@@ -240,7 +242,9 @@ public class RangeReaderReadableByteChannel implements ReadableByteChannel {
         try {
             return String.format(
                     "RangeReaderReadableByteChannel[source=%s, position=%d, size=%d]",
-                    rangeReader.getSourceIdentifier(), position.get(), rangeReader.size());
+                    rangeReader.getSourceIdentifier(),
+                    position.get(),
+                    rangeReader.size().orElse(-1));
         } catch (IOException e) {
             return String.format(
                     "RangeReaderReadableByteChannel[source=%s, position=%d, size=unknown]",

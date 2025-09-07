@@ -120,21 +120,19 @@ var reader = DiskCachingRangeReader.builder(delegate)
     .build();
 ```
 
-### Block Alignment
+### Read Optimization
 
-Configure block alignment for optimal cloud storage access:
+Optimize read patterns for your specific use case:
 
 ```java
-// Small blocks for random access
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(delegate)
-    .blockSize(64 * 1024)  // 64KB
+// For random access patterns, use memory caching
+var reader = CachingRangeReader.builder(delegate)
+    .maximumSize(1000)  // Cache frequently accessed ranges
     .build();
 
-// Large blocks for sequential access
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(delegate)
-    .blockSize(8 * 1024 * 1024)  // 8MB
+// For large sequential reads, use disk caching
+var reader = DiskCachingRangeReader.builder(delegate)
+    .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB disk cache
     .build();
 ```
 
@@ -291,16 +289,13 @@ Optimize for applications that make many small, random reads:
 
 ```java
 // ✅ CORRECT: Optimize cloud storage for high-frequency random access
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(CachingRangeReader.builder(
-        S3RangeReader.builder()
-            .uri(URI.create("s3://bucket/data.bin"))
-            .region(Region.US_WEST_2)
-            .build())
-        .maximumSize(2000)  // Large memory cache
-        .expireAfterAccess(1, TimeUnit.HOURS)
+var reader = CachingRangeReader.builder(
+    S3RangeReader.builder()
+        .uri(URI.create("s3://bucket/data.bin"))
+        .region(Region.US_WEST_2)
         .build())
-    .blockSize(64 * 1024)  // Small blocks for memory cache
+    .maximumSize(2000)  // Large memory cache
+    .expireAfterAccess(1, TimeUnit.HOURS)
     .build();
 ```
 
@@ -312,15 +307,12 @@ Optimize for applications that read large chunks sequentially:
 
 ```java
 // ✅ CORRECT: Optimize HTTP for large sequential reads
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(DiskCachingRangeReader.builder(
-        HttpRangeReader.builder()
-            .uri(URI.create("https://cdn.example.com/large-dataset.bin"))
-            .withBearerToken(authToken)
-            .build())
-        .maxCacheSizeBytes(5L * 1024 * 1024 * 1024)  // 5GB disk cache
+var reader = DiskCachingRangeReader.builder(
+    HttpRangeReader.builder()
+        .uri(URI.create("https://cdn.example.com/large-dataset.bin"))
+        .withBearerToken(authToken)
         .build())
-    .blockSize(8 * 1024 * 1024)  // Large blocks (8MB)
+    .maxCacheSizeBytes(5L * 1024 * 1024 * 1024)  // 5GB disk cache
     .build();
 ```
 
@@ -330,22 +322,16 @@ Optimize for cloud storage with network resilience:
 
 ```java
 // ✅ CORRECT: Multi-level caching with proper decorator order
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(CachingRangeReader.builder(
-        BlockAlignedRangeReader.builder()
-            .delegate(DiskCachingRangeReader.builder(
-                S3RangeReader.builder()
-                    .uri(s3Uri)
-                    .region(region)
-                    .build())
-                .maxCacheSizeBytes(20L * 1024 * 1024 * 1024)  // 20GB persistent cache
-                .build())
-            .blockSize(4 * 1024 * 1024)  // 4MB blocks for disk cache
+var reader = CachingRangeReader.builder(
+    DiskCachingRangeReader.builder(
+        S3RangeReader.builder()
+            .uri(s3Uri)
+            .region(region)
             .build())
-        .maximumSize(1000)  // Memory cache entries
-        .expireAfterAccess(2, TimeUnit.HOURS)
+        .maxCacheSizeBytes(20L * 1024 * 1024 * 1024)  // 20GB persistent cache
         .build())
-    .blockSize(64 * 1024)  // 64KB blocks for memory cache
+    .maximumSize(1000)  // Memory cache entries
+    .expireAfterAccess(2, TimeUnit.HOURS)
     .build();
 ```
 
@@ -355,37 +341,31 @@ Optimize for environments with limited memory:
 
 ```java
 // ✅ CORRECT: Memory-constrained cloud storage optimization
-var reader = BlockAlignedRangeReader.builder()
-    .delegate(CachingRangeReader.builder(
-        BlockAlignedRangeReader.builder()
-            .delegate(DiskCachingRangeReader.builder(
-                AzureBlobRangeReader.builder()
-                    .uri(URI.create("https://account.blob.core.windows.net/container/data.bin"))
-                    .sasToken(sasToken)
-                    .build())
-                .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB disk cache
-                .deleteOnClose()  // Clean up cache
-                .build())
-            .blockSize(1024 * 1024)  // 1MB blocks for disk
+var reader = CachingRangeReader.builder(
+    DiskCachingRangeReader.builder(
+        AzureBlobRangeReader.builder()
+            .uri(URI.create("https://account.blob.core.windows.net/container/data.bin"))
+            .sasToken(sasToken)
             .build())
-        .maximumSize(50)  // Small memory cache
-        .softValues()     // Allow GC to reclaim memory
+        .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB disk cache
+        .deleteOnClose()  // Clean up cache
         .build())
-    .blockSize(64 * 1024)  // 64KB blocks for memory
+    .maximumSize(50)  // Small memory cache
+    .softValues()     // Allow GC to reclaim memory
     .build();
 ```
 
 ## Configuration Guidelines
 
-### Block Size Selection
+### Read Strategy Selection
 
-| Data Source | Recommended Block Size | Rationale |
-|-------------|------------------------|-----------|
-| **Local Files** | 64KB - 1MB | Balance I/O efficiency and memory |
-| **HTTP** | 256KB - 1MB | Reduce request overhead |
-| **S3** | 1MB - 8MB | Minimize API calls |
-| **Azure Blob** | 1MB - 4MB | Optimize for Azure's performance |
-| **Google Cloud** | 1MB - 8MB | Balance throughput and latency |
+| Data Source | Recommended Strategy | Rationale |
+|-------------|----------------------|-----------|
+| **Local Files** | Direct reads | OS caching is already optimal |
+| **HTTP** | Chunked reads (256KB - 1MB) | Reduce request overhead |
+| **S3** | Large reads (1MB - 8MB) | Minimize API calls |
+| **Azure Blob** | Large reads (1MB - 4MB) | Optimize for Azure's performance |
+| **Google Cloud** | Large reads (1MB - 8MB) | Balance throughput and latency |
 
 ### Cache Size Guidelines
 
@@ -398,18 +378,14 @@ var reader = BlockAlignedRangeReader.builder()
 
 ### ⚠️ CRITICAL: Decorator Stacking Order
 
-**BlockAlignedRangeReader must ALWAYS wrap caching decorators to prevent overlapping ranges!**
+**CachingRangeReader should wrap DiskCachingRangeReader for optimal performance!**
 
 ```
 Application
     ↓
-BlockAlignedRangeReader (64KB blocks for memory)
+CachingRangeReader (memory - fast access)
     ↓
-CachingRangeReader (memory - non-overlapping blocks)
-    ↓
-BlockAlignedRangeReader (1MB blocks for disk)
-    ↓
-DiskCachingRangeReader (persistent - non-overlapping blocks)
+DiskCachingRangeReader (persistent storage)
     ↓
 BaseReader (source-specific)
     ↓
@@ -417,9 +393,9 @@ Data Source
 ```
 
 **Why this order matters:**
-- **Prevents cache pollution**: No overlapping ranges stored in cache
-- **Optimal memory usage**: Each cache layer stores aligned, non-overlapping blocks
-- **Maximum performance**: Clean cache hits without range conflicts
+- **Fast access**: Memory cache provides immediate results for recently accessed ranges
+- **Persistence**: Disk cache survives application restarts
+- **Optimal fallback**: Missing memory cache entries can be served from disk cache
 
 ## Monitoring and Diagnostics
 
@@ -465,6 +441,16 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 export HTTP_PROXY=http://proxy.company.com:8080
 export HTTPS_PROXY=https://proxy.company.com:8080
 ```
+
+## Extending RangeReader Functionality
+
+The Tileverse Range Reader library is designed to be highly extensible, allowing you to easily add support for new data sources or custom protocols beyond the built-in `file://`, `http(s)://`, `s3://`, and `gs://` options (cloud providers like Azure are automatically detected from `http(s)` URLs).
+
+This is achieved through a powerful plugin mechanism. If you have a unique storage system or a specific way of accessing data that isn't covered by the standard implementations, you can create your own "custom reader" and integrate it seamlessly with the library.
+
+Once your custom reader is developed and properly configured, the `RangeReaderFactory` will automatically discover it and use it when you request a `RangeReader` for a URI that your custom reader can handle. This means you can extend the library's capabilities without modifying its core code.
+
+For detailed technical instructions on how to develop and register a new custom reader, please refer to the [Extension Architecture](../developer-guide/architecture.md#service-provider-interface-spi) section in the Developer Guide.
 
 ## Resource Management Patterns
 

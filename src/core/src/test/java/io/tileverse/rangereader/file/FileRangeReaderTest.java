@@ -15,14 +15,17 @@
  */
 package io.tileverse.rangereader.file;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -44,7 +47,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Comprehensive tests for FileRangeReader.
  */
-public class FileRangeReaderTest {
+class FileRangeReaderTest {
 
     @TempDir
     Path tempDir;
@@ -77,6 +80,29 @@ public class FileRangeReaderTest {
     }
 
     @Test
+    void testBuilder() throws IOException {
+        assertThat(FileRangeReader.builder().path(testFile).build())
+                .isNotNull()
+                .hasFieldOrPropertyWithValue("path", testFile);
+        assertThat(FileRangeReader.builder().path(testFile.toString()).build())
+                .isNotNull()
+                .hasFieldOrPropertyWithValue("path", testFile);
+        assertThat(FileRangeReader.builder().uri(testFile.toUri()).build())
+                .isNotNull()
+                .hasFieldOrPropertyWithValue("path", testFile);
+
+        IllegalArgumentException iae = assertThrows(IllegalArgumentException.class, () -> FileRangeReader.builder()
+                .uri(URI.create("http://test.com/file")));
+        assertThat(iae)
+                .hasRootCauseInstanceOf(FileSystemNotFoundException.class)
+                .hasMessageContainingAll(
+                        "Unable to create reader for URI http://test.com/file", "Provider \"http\" not installed");
+
+        assertThrows(
+                IllegalStateException.class, () -> FileRangeReader.builder().build());
+    }
+
+    @Test
     void testConstructorWithNullPath() {
         assertThrows(NullPointerException.class, () -> FileRangeReader.of(null));
     }
@@ -89,7 +115,7 @@ public class FileRangeReaderTest {
 
     @Test
     void testGetSize() throws IOException {
-        assertEquals(textContent.length(), reader.size());
+        assertEquals(textContent.length(), reader.size().getAsLong());
     }
 
     @Test
@@ -244,7 +270,7 @@ public class FileRangeReaderTest {
 
         try (FileRangeReader binaryReader = FileRangeReader.of(binaryFile)) {
             // Check size
-            assertEquals(binaryContent.length, binaryReader.size());
+            assertEquals(binaryContent.length, binaryReader.size().getAsLong());
 
             // Read full content
             ByteBuffer fullBuffer =
@@ -281,7 +307,7 @@ public class FileRangeReaderTest {
 
         try (FileRangeReader largeReader = FileRangeReader.of(largeFile)) {
             // Check size
-            assertEquals(size, largeReader.size());
+            assertEquals(size, largeReader.size().getAsLong());
 
             // Read 100KB from the middle
             int offset = 400 * 1024; // 400KB offset
@@ -308,7 +334,7 @@ public class FileRangeReaderTest {
 
         try (FileRangeReader emptyReader = FileRangeReader.of(emptyFile)) {
             // Size should be 0
-            assertEquals(0, emptyReader.size());
+            assertEquals(0, emptyReader.size().getAsLong());
 
             // Reading should return empty buffer
             ByteBuffer buffer = emptyReader.readRange(0, 10).flip();

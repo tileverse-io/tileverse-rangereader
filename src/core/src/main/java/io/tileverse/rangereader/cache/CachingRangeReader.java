@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -251,8 +252,11 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
      */
     private int computeBlockSize(long blockStartOffset) {
         try {
-            long fileSize = delegate.size();
-            long maxPossibleSize = fileSize - blockStartOffset;
+            OptionalLong fileSize = delegate.size();
+            if (fileSize.isEmpty()) {
+                return blockSize;
+            }
+            long maxPossibleSize = fileSize.getAsLong() - blockStartOffset;
 
             // If the full block size fits within the file, use it
             if (maxPossibleSize >= blockSize) {
@@ -413,7 +417,7 @@ public class CachingRangeReader extends AbstractRangeReader implements RangeRead
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         return delegate.size();
     }
 
