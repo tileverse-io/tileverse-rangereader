@@ -147,16 +147,7 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
             .build();
 
     /**
-     * The AWS access key ID to use for authentication. If not provided, the client will use the default credentials
-     * provider chain to find credentials. The default credential provider chain looks for credentials in this order:
-     * <ol>
-     *     <li>Java System Properties - {@code aws.accessKeyId} and {@code aws.secretAccessKey}</li>
-     *     <li>Environment Variables - {@code AWS_ACCESS_KEY_ID} and {@code AWS_SECRET_ACCESS_KEY}</li>
-     *     <li>Web Identity Token File - from the path specified in the {@code AWS_WEB_IDENTITY_TOKEN_FILE} environment variable</li>
-     *     <li>Shared Credentials File - at {@code ~/.aws/credentials}</li>
-     *     <li>Amazon ECS Container Credentials - loaded from the endpoint specified in the {@code AWS_CONTAINER_CREDENTIALS_RELATIVE_URI} environment variable</li>
-     *     <li>Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service</li>
-     * </ol>
+     * The AWS access key ID to use for authentication when both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are provided.
      */
     public static final RangeReaderParameter<String> AWS_ACCESS_KEY_ID = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.s3.aws-access-key-id")
@@ -165,15 +156,11 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
                     """
                     The AWS access key ID to use for authentication.
 
-                    If not provided, the client will use the default credentials provider chain.
+                    This parameter must be used together with AWS_SECRET_ACCESS_KEY. When both are provided, \
+                    they will be used for authentication regardless of the USE_DEFAULT_CREDENTIALS_PROVIDER setting.
 
-                    The default credential provider chain looks for credentials in this order:
-                      1. Java System Properties - aws.accessKeyId and aws.secretAccessKey
-                      2. Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-                      3. Web Identity Token File - from the path specified in the AWS_WEB_IDENTITY_TOKEN_FILE environment variable
-                      4. Shared Credentials File - at ~/.aws/credentials
-                      5. Amazon ECS Container Credentials - loaded from the endpoint specified in the AWS_CONTAINER_CREDENTIALS_RELATIVE_URI environment variable
-                      6. Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service
+                    If neither AWS_ACCESS_KEY_ID nor AWS_SECRET_ACCESS_KEY are provided, authentication behavior \
+                    is controlled by the USE_DEFAULT_CREDENTIALS_PROVIDER parameter.
                     """)
             .type(String.class)
             .group(ID)
@@ -181,16 +168,7 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
             .build();
 
     /**
-     * The AWS secret access key to use for authentication. If not provided, the client will use the default credentials
-     * provider chain to find credentials. The default credential provider chain looks for credentials in this order:
-     * <ol>
-     *     <li>Java System Properties - {@code aws.accessKeyId} and {@code aws.secretAccessKey}</li>
-     *     <li>Environment Variables - {@code AWS_ACCESS_KEY_ID} and {@code AWS_SECRET_ACCESS_KEY}</li>
-     *     <li>Web Identity Token File - from the path specified in the {@code AWS_WEB_IDENTITY_TOKEN_FILE} environment variable</li>
-     *     <li>Shared Credentials File - at {@code ~/.aws/credentials}</li>
-     *     <li>Amazon ECS Container Credentials - loaded from the endpoint specified in the {@code AWS_CONTAINER_CREDENTIALS_RELATIVE_URI} environment variable</li>
-     *     <li>Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service</li>
-     * </ol>
+     * The AWS secret access key to use for authentication when both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are provided.
      */
     public static final RangeReaderParameter<String> AWS_SECRET_ACCESS_KEY = RangeReaderParameter.builder()
             .key("io.tileverse.rangereader.s3.aws-secret-access-key")
@@ -199,23 +177,66 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
                     """
                     The AWS secret access key to use for authentication.
 
-                    If not provided, the client will use the default credentials provider chain.
+                    This parameter must be used together with AWS_ACCESS_KEY_ID. When both are provided, \
+                    they will be used for authentication regardless of the USE_DEFAULT_CREDENTIALS_PROVIDER setting.
 
-                    The default credential provider chain looks for credentials in this order:
-                      1. Java System Properties - aws.accessKeyId and aws.secretAccessKey
-                      2. Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-                      3. Web Identity Token File - from the path specified in the AWS_WEB_IDENTITY_TOKEN_FILE environment variable
-                      4. Shared Credentials File - at ~/.aws/credentials
-                      5. Amazon ECS Container Credentials - loaded from the endpoint specified in the AWS_CONTAINER_CREDENTIALS_RELATIVE_URI environment variable
-                      6. Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service
+                    If neither AWS_ACCESS_KEY_ID nor AWS_SECRET_ACCESS_KEY are provided, authentication behavior \
+                    is controlled by the USE_DEFAULT_CREDENTIALS_PROVIDER parameter.
                     """)
             .type(String.class)
             .group(ID)
             .subgroup(SUBGROUP_AUTHENTICATION)
             .build();
 
-    static final List<RangeReaderParameter<?>> PARAMS =
-            List.of(FORCE_PATH_STYLE, REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY);
+    /** Configuration parameter to control whether to use the default AWS credentials provider chain. */
+    public static final RangeReaderParameter<Boolean> USE_DEFAULT_CREDENTIALS_PROVIDER = RangeReaderParameter.builder()
+            .key("io.tileverse.rangereader.s3.use-default-credentials-provider")
+            .title("Use Default Credentials Provider")
+            .description(
+                    """
+                    When enabled, the AWS default credentials provider chain is used, which looks for credentials \
+                    in this order:
+                      1. Java System Properties - aws.accessKeyId and aws.secretAccessKey
+                      2. Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+                      3. Web Identity Token File - from the path specified in the AWS_WEB_IDENTITY_TOKEN_FILE environment variable
+                      4. Shared Credentials File - at ~/.aws/credentials
+                      5. Amazon ECS Container Credentials - loaded from the endpoint specified in the AWS_CONTAINER_CREDENTIALS_RELATIVE_URI environment variable
+                      6. Amazon EC2 Instance Profile Credentials - loaded from the Amazon EC2 metadata service
+
+                    If neither default credentials provider or access/secret key are used, annonymous access will \
+                    be attempted.
+                    """)
+            .type(Boolean.class)
+            .group(ID)
+            .subgroup(SUBGROUP_AUTHENTICATION)
+            .build();
+
+    /** Configuration parameter to specify a custom AWS credentials profile name. */
+    public static final RangeReaderParameter<String> DEFAULT_CREDENTIALS_PROFILE = RangeReaderParameter.builder()
+            .key("io.tileverse.rangereader.s3.default-credentials-profile")
+            .title("Default Credentials Profile")
+            .description(
+                    """
+                    The AWS credentials profile name to use when USE_DEFAULT_CREDENTIALS_PROVIDER is enabled.
+
+                    If not specified, the 'default' profile is used. This parameter is only effective when \
+                    USE_DEFAULT_CREDENTIALS_PROVIDER is set to true.
+
+                    The profile should exist in the AWS credentials file (typically ~/.aws/credentials) or \
+                    AWS config file (typically ~/.aws/config).
+                    """)
+            .type(String.class)
+            .group(ID)
+            .subgroup(SUBGROUP_AUTHENTICATION)
+            .build();
+
+    static final List<RangeReaderParameter<?>> PARAMS = List.of(
+            FORCE_PATH_STYLE,
+            REGION,
+            AWS_ACCESS_KEY_ID,
+            AWS_SECRET_ACCESS_KEY,
+            USE_DEFAULT_CREDENTIALS_PROVIDER,
+            DEFAULT_CREDENTIALS_PROFILE);
 
     @Override
     public String getId() {
@@ -255,6 +276,8 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
         opts.getParameter(REGION).map(Region::of).ifPresent(builder::region);
         opts.getParameter(AWS_ACCESS_KEY_ID).ifPresent(builder::awsAccessKeyId);
         opts.getParameter(AWS_SECRET_ACCESS_KEY).ifPresent(builder::awsSecretAccessKey);
+        opts.getParameter(USE_DEFAULT_CREDENTIALS_PROVIDER).ifPresent(builder::useDefaultCredentialsProvider);
+        opts.getParameter(DEFAULT_CREDENTIALS_PROFILE).ifPresent(builder::defaultCredentialsProfile);
         return builder;
     }
 
@@ -263,13 +286,21 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
         if (RangeReaderConfig.matches(config, getId(), "s3", "http", "https")) {
             try {
                 S3Reference l = S3CompatibleUrlParser.parseS3Url(config.uri());
-                boolean requiresPathStyle = l.requiresPathStyle();
-                if (requiresPathStyle) {
-                    return l.endpoint() != null && l.bucket() != null && l.key() != null;
+
+                // RangeReader requires both bucket AND key to read a specific file
+                // This ensures ambiguous URLs (like custom domains) fall back to HTTP
+                boolean hasValidBucket =
+                        l.bucket() != null && !l.bucket().trim().isEmpty();
+                boolean hasValidKey = l.key() != null && !l.key().trim().isEmpty();
+
+                if (!hasValidBucket || !hasValidKey) {
+                    logger.debug("Skipping URL {} - bucket='{}', key='{}'", config.uri(), l.bucket(), l.key());
+                    return false;
                 }
-                return l.bucket() != null && l.key() != null;
+
+                return true;
             } catch (IllegalArgumentException e) {
-                logger.debug("Can't process URL {}", config.uri());
+                logger.debug("Can't process URL {}: {}", config.uri(), e.getMessage());
             }
         }
         return false;

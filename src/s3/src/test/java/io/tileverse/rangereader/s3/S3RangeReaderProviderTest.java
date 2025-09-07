@@ -15,7 +15,7 @@
  */
 package io.tileverse.rangereader.s3;
 
-import static io.tileverse.rangereader.s3.S3RangeReaderProvider.AWS_ACCESS_KEY_ID;
+import static io.tileverse.rangereader.s3.S3RangeReaderProvider.*;
 import static io.tileverse.rangereader.s3.S3RangeReaderProvider.AWS_SECRET_ACCESS_KEY;
 import static io.tileverse.rangereader.s3.S3RangeReaderProvider.FORCE_PATH_STYLE;
 import static io.tileverse.rangereader.s3.S3RangeReaderProvider.REGION;
@@ -86,7 +86,14 @@ class S3RangeReaderProviderTest {
     @Test
     void buildParameters() {
         List<RangeReaderParameter<?>> parameters = provider.buildParameters();
-        assertThat(parameters).isEqualTo(List.of(FORCE_PATH_STYLE, REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY));
+        assertThat(parameters)
+                .isEqualTo(List.of(
+                        FORCE_PATH_STYLE,
+                        REGION,
+                        AWS_ACCESS_KEY_ID,
+                        AWS_SECRET_ACCESS_KEY,
+                        USE_DEFAULT_CREDENTIALS_PROVIDER,
+                        DEFAULT_CREDENTIALS_PROFILE));
     }
 
     @Test
@@ -116,8 +123,8 @@ class S3RangeReaderProviderTest {
         assertThat(provider.canProcess(config.uri("http://localhost:9000/"))).isFalse();
         assertThat(provider.canProcess(config.uri("https://s3.amazonaws.com/"))).isFalse();
 
-        // Valid S3 URIs - bucket only is now supported
-        assertThat(provider.canProcess(config.uri("s3://my-bucket"))).isTrue();
+        // S3 URIs - bucket only points to bucket root, not a file (should use HTTP)
+        assertThat(provider.canProcess(config.uri("s3://my-bucket"))).isFalse();
         assertThat(provider.canProcess(config.uri("s3://my-bucket/my-blob"))).isTrue();
 
         // Valid AWS S3 URLs
@@ -138,12 +145,12 @@ class S3RangeReaderProviderTest {
         assertThat(provider.canProcess(config.uri("https://storage.googleapis.com/my-bucket/my-blob")))
                 .isTrue();
 
-        // Bucket root URLs are valid
-        assertThat(provider.canProcess(config.uri("s3://my-bucket/"))).isTrue();
+        // Bucket root URLs (with trailing slash) point to bucket root, not files (should use HTTP)
+        assertThat(provider.canProcess(config.uri("s3://my-bucket/"))).isFalse();
         assertThat(provider.canProcess(config.uri("http://localhost:9000/my-bucket/")))
-                .isTrue();
+                .isFalse();
         assertThat(provider.canProcess(config.uri("https://s3.amazonaws.com/my-bucket/")))
-                .isTrue();
+                .isFalse();
     }
 
     @Test
@@ -232,10 +239,10 @@ class S3RangeReaderProviderTest {
                 .as("URLs without bucket/key path cannot be processed")
                 .isFalse();
 
-        // URLs with only bucket but no key are valid (bucket root)
+        // URLs with only bucket but no key point to bucket root, not files (should use HTTP)
         assertThat(provider.canProcess(config.uri("http://localhost:9000/my-bucket")))
-                .as("Bucket root URLs are valid")
-                .isTrue();
+                .as("Bucket root URLs should use HTTP, not S3 client")
+                .isFalse();
     }
 
     @Test
