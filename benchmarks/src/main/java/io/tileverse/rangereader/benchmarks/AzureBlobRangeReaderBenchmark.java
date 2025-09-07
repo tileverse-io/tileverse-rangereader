@@ -120,7 +120,7 @@ public class AzureBlobRangeReaderBenchmark extends AbstractRangeReaderBenchmark 
         return AzureBlobRangeReader.builder()
                 .connectionString(connectionString)
                 .containerName(CONTAINER_NAME)
-                .blobPath(TEST_BLOB_NAME)
+                .blobName(TEST_BLOB_NAME)
                 .build();
     }
 

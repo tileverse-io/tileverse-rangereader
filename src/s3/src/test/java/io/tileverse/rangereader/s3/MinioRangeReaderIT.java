@@ -47,7 +47,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
  * with S3-compatible storage systems beyond AWS S3.
  */
 @Testcontainers(disabledWithoutDocker = true)
-public class MinioRangeReaderIT extends AbstractRangeReaderIT {
+class MinIORangeReaderIT extends AbstractRangeReaderIT {
 
     private static final String BUCKET_NAME = "test-bucket";
     private static final String KEY_NAME = "test.bin";
@@ -98,14 +98,14 @@ public class MinioRangeReaderIT extends AbstractRangeReaderIT {
 
     @Override
     protected RangeReader createBaseReader() throws IOException {
-        S3Client client = S3Client.builder()
-                .endpointOverride(URI.create(minio.getS3URL()))
+        return S3RangeReader.builder()
+                .uri(minio.getS3URL())
+                .bucket(BUCKET_NAME)
+                .key(KEY_NAME)
                 .region(Region.US_EAST_1)
                 .credentialsProvider(credentialsProvider)
-                .forcePathStyle(true)
+                .forcePathStyle()
                 .build();
-
-        return new S3RangeReader(client, BUCKET_NAME, KEY_NAME);
     }
 
     /**

@@ -33,6 +33,7 @@ help:
 	@echo "  test-s3-it    - Run S3 integration tests only"
 	@echo "  test-azure-it - Run Azure integration tests only"
 	@echo "  test-gcs-it   - Run GCS integration tests only"
+	@echo "  test-all-it   - Run integration tests in the aggregator module"
 	@echo "  perf-test     - Run performance tests"
 	@echo ""
 	@echo "Benchmark targets:"
@@ -130,6 +131,10 @@ test-azure-it:
 .PHONY: test-gcs-it
 test-gcs-it:
 	./mvnw verify -pl src/gcs -Dsurefire.skip=true -ntp
+
+.PHONY: test-all-it
+test-all-it:
+	./mvnw verify -pl src/all -Dsurefire.skip=true -ntp
 
 .PHONY: build-benchmarks
 build-benchmarks:

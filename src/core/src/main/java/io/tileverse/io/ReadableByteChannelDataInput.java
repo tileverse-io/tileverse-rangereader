@@ -258,6 +258,10 @@ public class ReadableByteChannelDataInput implements DataInput {
     /**
      * Reads a modified UTF-8 string as used by DataInputStream/DataOutputStream.
      * This handles the special encoding used by Java's writeUTF/readUTF methods.
+     *
+     * @param bytearr The byte array containing the modified UTF-8 data.
+     * @return The decoded String.
+     * @throws IOException If the byte array contains malformed modified UTF-8 data.
      */
     protected String readModifiedUTF8(byte[] bytearr) throws IOException {
         int utflen = bytearr.length;

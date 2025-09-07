@@ -20,8 +20,8 @@ import com.azure.identity.ClientSecretCredentialBuilder;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.identity.ManagedIdentityCredentialBuilder;
 import io.tileverse.rangereader.RangeReader;
-import io.tileverse.rangereader.RangeReaderFactory;
 import io.tileverse.rangereader.azure.AzureBlobRangeReader;
+import io.tileverse.rangereader.cache.CachingRangeReader;
 import io.tileverse.rangereader.s3.S3RangeReader;
 import java.io.IOException;
 import java.net.URI;
@@ -41,7 +41,7 @@ import software.amazon.awssdk.services.s3.S3Client;
  * Note: These examples are for illustration purposes only and not meant to be run directly.
  * In a real application, you would use your actual credentials and endpoints.
  */
-public class CloudAuthenticationExample {
+class CloudAuthenticationExample {
 
     /**
      * Examples of AWS S3 authentication methods.
@@ -51,21 +51,31 @@ public class CloudAuthenticationExample {
         URI s3Uri = URI.create("s3://example-bucket/path/to/file.pmtiles");
 
         // 1. Default credentials (checks env vars, AWS profile, EC2 instance profile, etc.)
-        RangeReader defaultReader = RangeReaderFactory.createS3RangeReader(
-                s3Uri, DefaultCredentialsProvider.builder().build());
+        RangeReader defaultReader = S3RangeReader.builder()
+                .uri(s3Uri)
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
+                .build();
 
         // 2. Specific AWS profile
-        RangeReader profileReader = RangeReaderFactory.createS3RangeReader(
-                s3Uri, ProfileCredentialsProvider.builder().profileName("dev").build());
+        RangeReader profileReader = S3RangeReader.builder()
+                .uri(s3Uri)
+                .credentialsProvider(
+                        ProfileCredentialsProvider.builder().profileName("dev").build())
+                .build();
 
         // 3. Static credentials (not recommended for production, use for testing only)
-        RangeReader staticReader = RangeReaderFactory.createS3RangeReader(
-                s3Uri,
-                StaticCredentialsProvider.create(AwsBasicCredentials.create("access-key-id", "secret-access-key")));
+        RangeReader staticReader = S3RangeReader.builder()
+                .uri(s3Uri)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create("access-key-id", "secret-access-key")))
+                .build();
 
         // 4. With specific region
-        RangeReader regionReader = RangeReaderFactory.createS3RangeReader(
-                s3Uri, DefaultCredentialsProvider.builder().build(), Region.US_WEST_2);
+        RangeReader regionReader = S3RangeReader.builder()
+                .uri(s3Uri)
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
+                .region(Region.US_WEST_2)
+                .build();
 
         // 5. Create with explicit bucket and key
         S3Client s3Client = S3Client.builder()
@@ -91,18 +101,23 @@ public class CloudAuthenticationExample {
      */
     public static void azureAuthenticationExamples() throws IOException {
         // Example Azure URI
-        URI azureUri = URI.create("azure://mystorageaccount.blob.core.windows.net/container/file.pmtiles");
+        URI azureUri = URI.create("https//mystorageaccount.blob.core.windows.net/container/file.pmtiles");
 
         // 1. Default credentials (checks env vars, managed identity, Visual Studio, Azure CLI, etc.)
         TokenCredential defaultCredential = new DefaultAzureCredentialBuilder().build();
-        RangeReader defaultReader = RangeReaderFactory.createAzureBlobRangeReader(azureUri, defaultCredential);
+        RangeReader defaultReader = AzureBlobRangeReader.builder()
+                .endpoint(azureUri)
+                .tokenCredential(defaultCredential)
+                .build();
 
         // 2. Managed Identity (useful in Azure hosted services like App Service, Functions, VMs)
         TokenCredential managedIdentityCredential = new ManagedIdentityCredentialBuilder()
                 .clientId("client-id") // Optional, if you have multiple identities
                 .build();
-        RangeReader managedIdentityReader =
-                RangeReaderFactory.createAzureBlobRangeReader(azureUri, managedIdentityCredential);
+        RangeReader managedIdentityReader = AzureBlobRangeReader.builder()
+                .endpoint(azureUri)
+                .tokenCredential(managedIdentityCredential)
+                .build();
 
         // 3. Service Principal with client secret
         TokenCredential servicePrincipalCredential = new ClientSecretCredentialBuilder()
@@ -111,28 +126,32 @@ public class CloudAuthenticationExample {
                 .clientSecret("client-secret")
                 .build();
         RangeReader servicePrincipalReader = AzureBlobRangeReader.builder()
-                .uri(azureUri)
+                .endpoint(azureUri)
                 .tokenCredential(servicePrincipalCredential)
                 .build();
 
         // 4. Storage account shared key (account key authentication)
-        RangeReader sharedKeyReader = RangeReaderFactory.createAzureBlobRangeReader(
-                "mystorageaccount",
-                "accountkey==", // Replace with actual key
-                "container",
-                "file.pmtiles");
+        RangeReader sharedKeyReader = AzureBlobRangeReader.builder()
+                .accountName("mystorageaccount")
+                .accountCredentials("mystorageaccount", "accountkey==") // Replace with actual key
+                .containerName("container")
+                .blobName("file.pmtiles")
+                .build();
 
         // 5. Connection string
         String connectionString =
                 "DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=accountkey==;EndpointSuffix=core.windows.net";
-        RangeReader connectionStringReader =
-                RangeReaderFactory.createAzureBlobRangeReader(connectionString, "container", "file.pmtiles");
+        RangeReader connectionStringReader = AzureBlobRangeReader.builder()
+                .connectionString(connectionString)
+                .containerName("container")
+                .blobName("file.pmtiles")
+                .build();
 
         // 6. SAS token (Shared Access Signature)
         // SAS tokens can be included directly in the URI's query string
         URI sasUri = URI.create(
-                "azure://mystorageaccount.blob.core.windows.net/container/file.pmtiles?sp=r&st=2023-01-01&se=2024-01-01&spr=https&sv=2022-11-02&sig=signature");
-        RangeReader sasReader = RangeReaderFactory.create(sasUri);
+                "https://mystorageaccount.blob.core.windows.net/container/file.pmtiles?sp=r&st=2023-01-01&se=2024-01-01&spr=https&sv=2022-11-02&sig=signature");
+        RangeReader sasReader = AzureBlobRangeReader.builder().endpoint(sasUri).build();
 
         // Clean up resources
         defaultReader.close();
@@ -151,26 +170,15 @@ public class CloudAuthenticationExample {
         URI uri = URI.create("s3://example-bucket/path/to/file.pmtiles");
 
         // Create a basic reader
-        RangeReader basicReader = RangeReaderFactory.create(uri);
+        RangeReader basicReader = S3RangeReader.builder().uri(uri).build();
 
         // Add caching for better performance
-        RangeReader cachedReader = RangeReaderFactory.createCaching(basicReader);
-
-        // Add block alignment for optimal cloud storage access (aligns reads to block boundaries)
-        RangeReader blockAlignedReader = RangeReaderFactory.createBlockAligned(basicReader);
-
-        // Combine both caching and block alignment (recommended for cloud storage)
-        RangeReader optimizedReader = RangeReaderFactory.createBlockAlignedCaching(basicReader);
-
-        // Use a custom block size (16KB instead of the default 8KB)
-        RangeReader customBlockSizeReader = RangeReaderFactory.createBlockAlignedCaching(basicReader, 16384);
+        RangeReader cachedReader =
+                CachingRangeReader.builder(basicReader).blockSize(32 * 1024).build();
 
         // Clean up resources
         basicReader.close();
         cachedReader.close();
-        blockAlignedReader.close();
-        optimizedReader.close();
-        customBlockSizeReader.close();
     }
 
     /**

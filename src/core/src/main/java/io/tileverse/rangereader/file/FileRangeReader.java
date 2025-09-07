@@ -21,10 +21,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 /**
  * A thread-safe file-based implementation of {@link RangeReader} that provides efficient random access to local files.
@@ -143,8 +145,8 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
      * @throws IOException if an I/O error occurs while determining the file size
      */
     @Override
-    public long size() throws IOException {
-        return channel.size();
+    public OptionalLong size() throws IOException {
+        return OptionalLong.of(channel.size());
     }
 
     /**
@@ -229,9 +231,7 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
          * @return this builder
          */
         public Builder path(String pathString) {
-            Objects.requireNonNull(pathString, "Path string cannot be null");
-            this.path = Paths.get(pathString);
-            return this;
+            return uri(URI.create(pathString));
         }
 
         /**
@@ -242,10 +242,15 @@ public class FileRangeReader extends AbstractRangeReader implements RangeReader 
          */
         public Builder uri(URI uri) {
             Objects.requireNonNull(uri, "URI cannot be null");
-            if (!"file".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalArgumentException("URI must have file scheme: " + uri);
+            if (null == uri.getScheme()) {
+                uri = URI.create("file:" + uri.toString());
             }
-            this.path = Paths.get(uri);
+            try {
+                this.path = Paths.get(uri);
+            } catch (IllegalArgumentException | FileSystemNotFoundException ex) {
+                throw new IllegalArgumentException(
+                        "Unable to create reader for URI %s: %s".formatted(uri, ex.getMessage()), ex);
+            }
             return this;
         }
 

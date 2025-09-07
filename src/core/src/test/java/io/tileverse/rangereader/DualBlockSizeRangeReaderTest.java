@@ -36,7 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Tests for using different block sizes for memory and disk operations.
  */
-public class DualBlockSizeRangeReaderTest {
+class DualBlockSizeRangeReaderTest {
 
     @TempDir
     Path tempDir;

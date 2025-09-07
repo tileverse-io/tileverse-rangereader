@@ -208,7 +208,7 @@ class RangeReaderReadableByteChannelTest {
 
         // Note: Channel doesn't close the underlying reader based on our design
         // The reader should still be usable
-        assertThat(reader.size()).isEqualTo(TEST_FILE_SIZE);
+        assertThat(reader.size().getAsLong()).isEqualTo(TEST_FILE_SIZE);
         reader.close(); // Clean up
     }
 

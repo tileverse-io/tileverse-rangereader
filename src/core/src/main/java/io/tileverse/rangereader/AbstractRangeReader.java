@@ -17,6 +17,7 @@ package io.tileverse.rangereader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.OptionalLong;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -117,16 +118,19 @@ public abstract class AbstractRangeReader implements RangeReader {
                     "Target buffer has insufficient remaining capacity: " + remainingBefore + " < " + length);
         }
 
-        final long fileSize = size();
-        if (offset >= fileSize) {
-            // Offset is beyond EOF, return 0 bytes read (position unchanged)
-            return 0;
-        }
-
         int actualLength = length;
-        if (offset + length > fileSize) {
-            // Read extends beyond EOF, truncate it
-            actualLength = (int) (fileSize - offset);
+
+        final OptionalLong fileSize = size();
+        if (fileSize.isPresent()) {
+            long size = fileSize.getAsLong();
+            if (offset >= size) {
+                // Offset is beyond EOF, return 0 bytes read (position unchanged)
+                return 0;
+            }
+            if (offset + length > size) {
+                // Read extends beyond EOF, truncate it
+                actualLength = (int) (size - offset);
+            }
         }
 
         final int readCount = readRangeNoFlip(offset, actualLength, target);

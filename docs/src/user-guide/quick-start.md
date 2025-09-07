@@ -96,22 +96,21 @@ try (var cachedReader = CachingRangeReader.builder(baseReader)
 
 > **Note**: For local files, caching provides little benefit since the OS already caches file data efficiently.
 
-### Block Alignment for Cloud Storage
+### Disk Caching for Large Datasets
 
 ```java
-import io.tileverse.rangereader.block.BlockAlignedRangeReader;
+import io.tileverse.rangereader.cache.DiskCachingRangeReader;
 
 var s3Reader = S3RangeReader.builder()
     .uri(URI.create("s3://bucket/large-file.bin"))
     .build();
 
-try (var alignedReader = BlockAlignedRangeReader.builder()
-        .delegate(s3Reader)
-        .blockSize(1024 * 1024)  // 1MB blocks
+try (var cachedReader = DiskCachingRangeReader.builder(s3Reader)
+        .maxCacheSizeBytes(1024 * 1024 * 1024)  // 1GB cache
         .build()) {
     
-    // Reads are automatically aligned to 1MB boundaries
-    ByteBuffer data = alignedReader.readRange(100, 500);
+    // Reads are cached to disk for persistence across sessions
+    ByteBuffer data = cachedReader.readRange(100, 500);
 }
 ```
 
@@ -121,11 +120,8 @@ try (var alignedReader = BlockAlignedRangeReader.builder()
 // Optimal configuration for cloud storage
 try (var optimizedReader = CachingRangeReader.builder(
         DiskCachingRangeReader.builder(
-            BlockAlignedRangeReader.builder()
-                .delegate(S3RangeReader.builder()
-                    .uri(URI.create("s3://bucket/data.bin"))
-                    .build())
-                .blockSize(1024 * 1024)  // 1MB blocks
+            S3RangeReader.builder()
+                .uri(URI.create("s3://bucket/data.bin"))
                 .build())
             .maxCacheSizeBytes(10L * 1024 * 1024 * 1024)  // 10GB disk cache
             .build())

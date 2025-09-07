@@ -37,5 +37,8 @@ public interface HttpAuthentication {
      */
     HttpRequest.Builder authenticate(HttpClient httpClient, HttpRequest.Builder requestBuilder);
 
+    /**
+     * A no-op authentication implementation that does not modify the request.
+     */
     static final HttpAuthentication NONE = (c, b) -> b;
 }

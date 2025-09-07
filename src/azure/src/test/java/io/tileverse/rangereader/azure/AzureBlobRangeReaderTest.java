@@ -31,6 +31,7 @@ import com.azure.storage.blob.models.BlobProperties;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -111,8 +112,8 @@ class AzureBlobRangeReaderTest {
             }
 
             @Override
-            public long size() throws IOException {
-                return CONTENT_LENGTH;
+            public OptionalLong size() throws IOException {
+                return OptionalLong.of(CONTENT_LENGTH);
             }
         });
     }
@@ -124,7 +125,7 @@ class AzureBlobRangeReaderTest {
 
         // Since we're using a spied instance with overridden methods,
         // we just verify the size is as expected
-        assertEquals(CONTENT_LENGTH, reader.size());
+        assertEquals(CONTENT_LENGTH, reader.size().getAsLong());
 
         // Our overridden size() method should not call getProperties again
         verify(blobClient, never()).getProperties();

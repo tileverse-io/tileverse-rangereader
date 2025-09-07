@@ -30,11 +30,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.containers.NginxContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 
 /**
  * Integration tests for HttpRangeReader using Nginx container.
@@ -47,68 +45,38 @@ import org.testcontainers.utility.DockerImageName;
  * Note: For tests using authentication, see HttpRangeReaderAuthenticationIT.
  */
 @Testcontainers(disabledWithoutDocker = true)
-public class HttpRangeReaderIT extends AbstractRangeReaderIT {
+class HttpRangeReaderIT extends AbstractRangeReaderIT {
 
-    private static final DockerImageName NGINX_IMAGE = DockerImageName.parse("nginx:alpine");
     private static final String TEST_FILE_NAME = "test.bin";
 
     private static URI testFileUri;
     private static Path testFilePath;
-
-    @TempDir
-    static Path tempDir;
-
-    @Container
-    @SuppressWarnings("resource")
-    static GenericContainer<?> nginx = new GenericContainer<>(NGINX_IMAGE)
-            .withCommand(
-                    "sh",
-                    "-c",
-                    """
-                    # Create test file
-                    mkdir -p /usr/share/nginx/html && \
-                    dd if=/dev/urandom of=/usr/share/nginx/html/test.bin bs=1024 count=100 && \
-                    echo -n -e 'TstFile\\x03' > /tmp/header && \
-                    dd if=/tmp/header of=/usr/share/nginx/html/test.bin bs=7 count=1 conv=notrunc && \
-
-                    # Set up Nginx config
-                    cat > /etc/nginx/conf.d/default.conf << 'EOF'
-                    server {
-                        listen 80;
-                        server_name localhost;
-                        location / {
-                            root /usr/share/nginx/html;
-                            autoindex on;
-                            add_header Accept-Ranges bytes;
-                        }
-                    }
-                    EOF
-
-                    # Start Nginx
-                    nginx -g 'daemon off;'
-                    """)
-            .withExposedPorts(80)
-            .waitingFor(Wait.forHttp("/"))
-            .withLogConsumer(outputFrame -> System.out.println("Nginx: " + outputFrame.getUtf8String()));
+    static NginxContainer<?> nginx;
 
     @BeforeAll
-    static void setupNginx() throws IOException, InterruptedException {
+    @SuppressWarnings("resource")
+    static void setupNginx(@TempDir Path tempDir) throws IOException, InterruptedException {
         System.out.println("Setting up Nginx container for HTTP Range Reader tests...");
 
         // Create local placeholder file for the abstract test class
         testFilePath = tempDir.resolve(TEST_FILE_NAME);
         TestUtil.createMockTestFile(testFilePath, TEST_FILE_SIZE);
 
+        nginx = new NginxContainer<>("nginx:latest")
+                .withCopyToContainer(
+                        MountableFile.forHostPath(testFilePath), "/usr/share/nginx/html/" + TEST_FILE_NAME);
+        nginx.start();
+
         // Set up the URI for accessing the test file via HTTP
         String baseUrl = String.format("http://%s:%d", nginx.getHost(), nginx.getFirstMappedPort());
         testFileUri = URI.create(baseUrl + "/" + TEST_FILE_NAME);
-
-        System.out.println("Test file available at: " + testFileUri);
     }
 
     @AfterAll
-    static void cleanupTestPaths() {
-        // No specific cleanup needed as testcontainers handles container cleanup
+    static void cleanup() {
+        if (nginx != null) {
+            nginx.stop();
+        }
     }
 
     @Override
@@ -133,7 +101,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
             assertTrue(reader instanceof HttpRangeReader, "Should be an HttpRangeReader instance");
 
             // Verify size matches
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
 
             // Read some data to verify it works correctly
             ByteBuffer buffer = reader.readRange(0, 10).flip();
@@ -153,7 +121,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
             assertTrue(reader instanceof HttpRangeReader, "Should be an HttpRangeReader instance");
 
             // Verify size matches
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
         }
     }
 
@@ -174,7 +142,7 @@ public class HttpRangeReaderIT extends AbstractRangeReaderIT {
         // Test making multiple consecutive range requests to verify connection handling
         try (RangeReader reader = createBaseReader()) {
             // Verify size as sanity check
-            assertEquals(TEST_FILE_SIZE, reader.size(), "File size should match");
+            assertEquals(TEST_FILE_SIZE, reader.size().getAsLong(), "File size should match");
 
             // Make multiple consecutive range requests
             for (int i = 0; i < 5; i++) {

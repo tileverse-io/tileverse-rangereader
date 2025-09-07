@@ -25,6 +25,7 @@ import io.tileverse.rangereader.RangeReader;
 import io.tileverse.rangereader.it.AbstractRangeReaderIT;
 import io.tileverse.rangereader.it.TestUtil;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,7 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * from an Azure Blob Storage container using the Azure SDK against an Azurite container.
  */
 @Testcontainers(disabledWithoutDocker = true)
-public class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
+class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
 
     private static final String CONTAINER_NAME = "test-container";
     private static final String BLOB_NAME = "test.bin";
@@ -101,11 +102,19 @@ public class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
     @Override
     protected RangeReader createBaseReader() throws IOException {
         // Create AzureBlobRangeReader using the factory method with connection string
+
+        Integer port = azurite.getMappedPort(10000);
+        URI uri = URI.create("http://localhost:%d/%s/%s/%s".formatted(port, ACCOUNT_NAME, CONTAINER_NAME, BLOB_NAME));
         return AzureBlobRangeReader.builder()
-                .connectionString(connectionString)
-                .containerName(CONTAINER_NAME)
-                .blobPath(BLOB_NAME)
+                .endpoint(uri) // sets containerName and blobPath
+                // authentication
+                // .accountName(ACCOUNT_NAME)//optional when using URI
+                .accountKey(ACCOUNT_KEY)
                 .build();
+        //                .connectionString(connectionString)
+        //                .containerName(CONTAINER_NAME)
+        //                .blobPath(BLOB_NAME)
+        //                .build();
     }
 
     /**
@@ -117,7 +126,7 @@ public class AzureBlobRangeReaderIT extends AbstractRangeReaderIT {
         try (RangeReader reader = AzureBlobRangeReader.builder()
                 .connectionString(connectionString)
                 .containerName(CONTAINER_NAME)
-                .blobPath(BLOB_NAME)
+                .blobName(BLOB_NAME)
                 .build()) {
 
             // Verify it's the right implementation

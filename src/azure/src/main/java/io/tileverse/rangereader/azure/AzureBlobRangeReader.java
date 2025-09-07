@@ -15,15 +15,23 @@
  */
 package io.tileverse.rangereader.azure;
 
+import static java.util.Objects.requireNonNull;
+
 import com.azure.core.credential.TokenCredential;
 import com.azure.core.http.rest.Response;
+import com.azure.core.util.logging.ClientLogger;
+import com.azure.identity.DefaultAzureCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobClientBuilder;
+import com.azure.storage.blob.BlobUrlParts;
+import com.azure.storage.blob.models.BlobErrorCode;
 import com.azure.storage.blob.models.BlobRange;
 import com.azure.storage.blob.models.BlobRequestConditions;
+import com.azure.storage.blob.models.BlobStorageException;
 import com.azure.storage.blob.models.DownloadRetryOptions;
 import com.azure.storage.common.StorageSharedKeyCredential;
+import com.azure.storage.common.implementation.connectionstring.StorageConnectionString;
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
 import java.io.ByteArrayOutputStream;
@@ -31,7 +39,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,7 +62,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
      * @throws IOException If an I/O error occurs
      */
     AzureBlobRangeReader(BlobClient blobClient) throws IOException {
-        this.blobClient = Objects.requireNonNull(blobClient, "BlobClient cannot be null");
+        this.blobClient = requireNonNull(blobClient, "BlobClient cannot be null");
 
         // Check if the blob exists and get its content length
         try {
@@ -63,8 +71,13 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
             }
 
             this.contentLength = blobClient.getProperties().getBlobSize();
-        } catch (Exception e) {
-            throw new IOException("Failed to access blob: " + blobClient.getBlobUrl(), e);
+        } catch (BlobStorageException e) {
+            BlobErrorCode errorCode = e.getErrorCode();
+            int statusCode = e.getStatusCode();
+            throw new IOException(
+                    "%s (%d): failure to access %s".formatted(errorCode, statusCode, blobClient.getBlobUrl()), e);
+        } catch (RuntimeException e) {
+            throw new IOException("failure to access %s: %s".formatted(blobClient.getBlobUrl(), e.getMessage()), e);
         }
     }
 
@@ -110,7 +123,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         if (contentLength < 0) {
             try {
                 contentLength = blobClient.getProperties().getBlobSize();
@@ -118,7 +131,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
                 throw new IOException("Failed to get blob size: " + e.getMessage(), e);
             }
         }
-        return contentLength;
+        return OptionalLong.of(contentLength);
     }
 
     @Override
@@ -157,7 +170,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
      * AzureBlobRangeReader reader = AzureBlobRangeReader.builder()
      *     .connectionString("DefaultEndpointsProtocol=https;AccountName=...")
      *     .containerName("mycontainer")
-     *     .blobPath("path/to/file.pmtiles")
+     *     .blobName("path/to/file.pmtiles")
      *     .build();
      * }</pre>
      *
@@ -167,7 +180,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
      *     .accountName("mystorageaccount")
      *     .accountKey("base64-encoded-key")
      *     .containerName("mycontainer")
-     *     .blobPath("path/to/file.pmtiles")
+     *     .blobName("path/to/file.pmtiles")
      *     .build();
      * }</pre>
      *
@@ -177,7 +190,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
      *     .accountName("mystorageaccount")
      *     .sasToken("?sv=2020-08-04&ss=bfqt...")
      *     .containerName("mycontainer")
-     *     .blobPath("path/to/file.pmtiles")
+     *     .blobName("path/to/file.pmtiles")
      *     .build();
      * }</pre>
      *
@@ -188,7 +201,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
      *     .accountName("mystorageaccount")
      *     .tokenCredential(credential)
      *     .containerName("mycontainer")
-     *     .blobPath("path/to/file.pmtiles")
+     *     .blobName("path/to/file.pmtiles")
      *     .build();
      * }</pre>
      *
@@ -207,8 +220,13 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
         private String accountKey;
         private String connectionString;
         private String containerName;
-        private String blobPath;
+        private String blobName;
         private String sasToken;
+        /**
+         * If provided, superseeds {@link #accountName}, {@link #containerName}, and {@link #blobName(String)} if provided in the URI
+         * @see BlobClientBuilder#endpoint(String)
+         */
+        private URI endpoint;
 
         private Builder() {}
 
@@ -219,7 +237,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @return this builder
          */
         public Builder tokenCredential(TokenCredential tokenCredential) {
-            this.tokenCredential = Objects.requireNonNull(tokenCredential, "Token credential cannot be null");
+            this.tokenCredential = requireNonNull(tokenCredential, "Token credential cannot be null");
             return this;
         }
 
@@ -230,7 +248,18 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @return this builder
          */
         public Builder accountName(String accountName) {
-            this.accountName = Objects.requireNonNull(accountName, "Account name cannot be null");
+            this.accountName = requireNonNull(accountName, "Account name cannot be null");
+            return this;
+        }
+
+        /**
+         * Sets the Azure Storage account name.
+         *
+         * @param accountKey the account name
+         * @return this builder
+         */
+        public Builder accountKey(String accountKey) {
+            this.accountKey = requireNonNull(accountKey, "Account key cannot be null");
             return this;
         }
 
@@ -242,8 +271,8 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @return this builder
          */
         public Builder accountCredentials(String accountName, String accountKey) {
-            this.accountName = Objects.requireNonNull(accountName, "Account name cannot be null");
-            this.accountKey = Objects.requireNonNull(accountKey, "Account key cannot be null");
+            accountName(accountName);
+            accountKey(accountKey);
             return this;
         }
 
@@ -254,7 +283,7 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @return this builder
          */
         public Builder connectionString(String connectionString) {
-            this.connectionString = Objects.requireNonNull(connectionString, "Connection string cannot be null");
+            this.connectionString = requireNonNull(connectionString, "Connection string cannot be null");
             return this;
         }
 
@@ -265,18 +294,18 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @return this builder
          */
         public Builder containerName(String containerName) {
-            this.containerName = Objects.requireNonNull(containerName, "Container name cannot be null");
+            this.containerName = requireNonNull(containerName, "Container name cannot be null");
             return this;
         }
 
         /**
          * Sets the blob path.
          *
-         * @param blobPath the blob path
+         * @param blobName the blob path
          * @return this builder
          */
-        public Builder blobPath(String blobPath) {
-            this.blobPath = Objects.requireNonNull(blobPath, "Blob path cannot be null");
+        public Builder blobName(String blobName) {
+            this.blobName = requireNonNull(blobName, "Blob path cannot be null");
             return this;
         }
 
@@ -287,49 +316,24 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @return this builder
          */
         public Builder sasToken(String sasToken) {
-            this.sasToken = Objects.requireNonNull(sasToken, "SAS token cannot be null");
+            this.sasToken = requireNonNull(sasToken, "SAS token cannot be null");
             return this;
         }
 
         /**
          * Sets the blob information from an Azure URI.
          *
-         * @param uri the Azure URI (azure://account.blob.core.windows.net/container/blob or https://...)
+         * @param uri the Azure URI (https://account.blob.core.windows.net/container/blob or https://...)
          * @return this builder
+         * @see BlobClientBuilder#endpoint(String)
          */
-        public Builder uri(URI uri) {
-            Objects.requireNonNull(uri, "URI cannot be null");
-
+        public Builder endpoint(URI uri) {
+            requireNonNull(uri, "URI cannot be null");
             String scheme = uri.getScheme().toLowerCase();
-            if (!"azure".equals(scheme) && !"https".equals(scheme) && !"blob".equals(scheme)) {
+            if (!("https".equals(scheme) || "http".equals(scheme))) {
                 throw new IllegalArgumentException("URI must have azure, https, or blob scheme: " + uri);
             }
-
-            String blobUrl = uri.toString();
-            if (scheme.equals("azure")) {
-                // Convert azure://account.blob.core.windows.net/container/blob
-                // to https://account.blob.core.windows.net/container/blob
-                blobUrl = blobUrl.replace("azure://", "https://");
-            }
-
-            // Parse container and blob from path
-            String path = uri.getPath();
-            if (path != null && path.startsWith("/")) {
-                String[] pathParts = path.substring(1).split("/", 2);
-                if (pathParts.length >= 1) {
-                    this.containerName = pathParts[0];
-                }
-                if (pathParts.length >= 2) {
-                    this.blobPath = pathParts[1];
-                }
-            }
-
-            // Check for SAS token in query string
-            String query = uri.getQuery();
-            if (query != null && !query.isEmpty()) {
-                this.sasToken = query;
-            }
-
+            this.endpoint = uri;
             return this;
         }
 
@@ -340,67 +344,62 @@ public class AzureBlobRangeReader extends AbstractRangeReader implements RangeRe
          * @throws IOException if an error occurs during construction
          */
         public AzureBlobRangeReader build() throws IOException {
-            BlobClient client;
-            if (connectionString != null) {
-                if (containerName == null || blobPath == null) {
+
+            BlobClientBuilder blobClientBuilder = new BlobClientBuilder();
+
+            String accountName = this.accountName;
+            String accountKey = this.accountKey;
+            String endpointUrl;
+
+            if (endpoint != null) {
+                endpointUrl = endpoint.toString();
+                // sets accountName, endpoint, containerName, and blobName from the URI
+                // also extracts the sasToken if present in the query string
+                blobClientBuilder.endpoint(endpointUrl);
+                if (accountName == null) {
+                    // but does not provide accessors, parse accountName
+                    BlobUrlParts parts = BlobUrlParts.parse(endpointUrl);
+                    accountName = parts.getAccountName();
+                }
+            } else if (connectionString != null) {
+                if (containerName == null || blobName == null) {
                     throw new IllegalStateException("Container name and blob path are required with connection string");
                 }
-                client = new BlobClientBuilder()
+                blobClientBuilder
                         .connectionString(connectionString)
                         .containerName(containerName)
-                        .blobName(blobPath)
-                        .buildClient();
-            } else if (accountName != null && accountKey != null) {
-                if (containerName == null || blobPath == null) {
-                    throw new IllegalStateException(
-                            "Container name and blob path are required with account credentials");
-                }
-                StorageSharedKeyCredential credential = new StorageSharedKeyCredential(accountName, accountKey);
-                String endpoint = String.format("https://%s.blob.core.windows.net", accountName);
-                client = new BlobClientBuilder()
-                        .endpoint(endpoint)
-                        .credential(credential)
-                        .containerName(containerName)
-                        .blobName(blobPath)
-                        .buildClient();
-            } else if (accountName != null && sasToken != null) {
-                if (containerName == null || blobPath == null) {
-                    throw new IllegalStateException("Container name and blob path are required with SAS token");
-                }
-                String sasTokenWithQuestion = sasToken.startsWith("?") ? sasToken : "?" + sasToken;
-                String endpoint = String.format("https://%s.blob.core.windows.net", accountName);
-                client = new BlobClientBuilder()
-                        .endpoint(endpoint)
-                        .containerName(containerName)
-                        .blobName(blobPath)
-                        .sasToken(sasTokenWithQuestion)
-                        .buildClient();
-            } else if (tokenCredential != null) {
-                if (containerName == null || blobPath == null || accountName == null) {
-                    throw new IllegalStateException(
-                            "Account name, container name and blob path are required with token credential");
-                }
-                String endpoint = String.format("https://%s.blob.core.windows.net", accountName);
-                client = new BlobClientBuilder()
-                        .endpoint(endpoint)
-                        .credential(tokenCredential)
-                        .containerName(containerName)
-                        .blobName(blobPath)
-                        .buildClient();
+                        .blobName(blobName);
+                StorageConnectionString storageConnectionString =
+                        StorageConnectionString.create(connectionString, new ClientLogger(AzureBlobRangeReader.class));
+                accountName = storageConnectionString.getAccountName();
+                endpointUrl = storageConnectionString.getBlobEndpoint().getPrimaryUri();
             } else {
-                // Use default Azure credential
-                if (containerName == null || blobPath == null || accountName == null) {
-                    throw new IllegalStateException("Account name, container name and blob path are required");
-                }
-                String endpoint = String.format("https://%s.blob.core.windows.net", accountName);
-                client = new BlobClientBuilder()
-                        .endpoint(endpoint)
-                        .credential(new DefaultAzureCredentialBuilder().build())
-                        .containerName(containerName)
-                        .blobName(blobPath)
-                        .buildClient();
+                throw new IllegalStateException(
+                        "Either provide the endpoint URI or connectionString, containerName, and blobName");
             }
 
+            // authentication
+            if (accountName != null && accountKey != null) {
+
+                StorageSharedKeyCredential credential = new StorageSharedKeyCredential(accountName, accountKey);
+                blobClientBuilder.credential(credential);
+
+            } else if (accountName != null && sasToken != null) {
+
+                String sasTokenWithQuestion = sasToken.startsWith("?") ? sasToken : "?" + sasToken;
+                blobClientBuilder.sasToken(sasTokenWithQuestion);
+
+            } else if (tokenCredential != null) {
+
+                blobClientBuilder.credential(tokenCredential);
+            } else if (endpointUrl.startsWith("https://%s.blob.core.windows.net".formatted(accountName))) {
+                // Use default Azure credential. REVISIT: should this be made a flag and AzureBlobRangeReaderProvider
+                // parameter instead?
+                DefaultAzureCredential defaultAzureCredential = new DefaultAzureCredentialBuilder().build();
+                blobClientBuilder.credential(defaultAzureCredential);
+            }
+
+            BlobClient client = blobClientBuilder.buildClient();
             return new AzureBlobRangeReader(client);
         }
     }

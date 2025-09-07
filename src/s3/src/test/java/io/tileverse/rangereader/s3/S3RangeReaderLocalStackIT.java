@@ -45,7 +45,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
  * from an S3 bucket using the AWS S3 API against a LocalStack container.
  */
 @Testcontainers(disabledWithoutDocker = true)
-public class S3RangeReaderIT extends AbstractRangeReaderIT {
+class S3RangeReaderLocalStackIT extends AbstractRangeReaderIT {
 
     private static final String BUCKET_NAME = "test-bucket";
     private static final String KEY_NAME = "test.bin";
@@ -105,7 +105,11 @@ public class S3RangeReaderIT extends AbstractRangeReaderIT {
                 .forcePathStyle(true)
                 .build();
 
-        return new S3RangeReader(client, BUCKET_NAME, KEY_NAME);
+        return S3RangeReader.builder()
+                .s3Client(client)
+                .bucket(BUCKET_NAME)
+                .key(KEY_NAME)
+                .build();
     }
 
     /**

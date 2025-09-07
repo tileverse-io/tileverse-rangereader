@@ -69,7 +69,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     private final HttpClient httpClient;
     private final HttpAuthentication authentication;
 
-    private volatile Long contentLength;
+    private volatile OptionalLong contentLength;
     private volatile boolean rangeInitialized = false;
     private volatile HttpResponse<Void> cachedHeadResponse = null;
 
@@ -187,7 +187,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
     }
 
     @Override
-    public long size() throws IOException {
+    public OptionalLong size() throws IOException {
         if (contentLength == null) {
             synchronized (this) {
                 if (contentLength == null) {
@@ -264,14 +264,11 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
         HttpResponse<Void> headResponse = getHeadResponse();
 
         // Get content length
-        OptionalLong contentLengthHeader = headResponse.headers().firstValueAsLong("Content-Length");
-        if (contentLengthHeader.isPresent()) {
-            this.contentLength = contentLengthHeader.getAsLong();
-            if (this.contentLength < 0) {
-                throw new IOException("Invalid content length header: " + contentLength);
-            }
-        } else {
-            throw new IOException("Content length header missing");
+        this.contentLength = headResponse.headers().firstValueAsLong("Content-Length");
+        if (this.contentLength.isEmpty()) {
+            LOGGER.warning("Content-Length unkown for " + uri);
+        } else if (this.contentLength.getAsLong() < 0) {
+            this.contentLength = OptionalLong.empty();
         }
     }
 
@@ -413,16 +410,28 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
      */
     public static class Builder {
 
+        /**
+         * The default connection timeout for the HTTP client.
+         */
         public static final Duration DEFAULT_CONNECTION_TIMEOUT = Duration.ofSeconds(5);
 
         private URI uri;
         private boolean trustAllCertificates = false;
         private HttpAuthentication authentication = HttpAuthentication.NONE;
+        /**
+         * The connection timeout for the HTTP client.
+         */
         public Duration connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
+
         private HttpClient suppliedHttpClient;
 
         Builder() {}
 
+        /**
+         * Creates a new builder with the specified URI.
+         *
+         * @param uri The URI to read from.
+         */
         public Builder(URI uri) {
             this.uri = uri;
         }
@@ -443,6 +452,12 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
             return this;
         }
 
+        /**
+         * Sets the connection timeout for the HTTP client.
+         *
+         * @param connectionTimeout The connection timeout.
+         * @return This builder instance.
+         */
         public Builder connectionTimeout(Duration connectionTimeout) {
             this.connectionTimeout = connectionTimeout;
             return this;
@@ -520,7 +535,7 @@ public class HttpRangeReader extends AbstractRangeReader implements RangeReader 
 
         /**
          * Alternative to provide a pre-configured {@link HttpClient}.
-         * @param client
+         * @param client The {@link HttpClient} to use.
          * @return this
          */
         public Builder httpClient(HttpClient client) {

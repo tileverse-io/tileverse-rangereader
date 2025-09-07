@@ -38,7 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
  * These tests verify that the FileRangeReader can correctly read ranges of bytes
  * from a file on the local filesystem.
  */
-public class FileRangeReaderIT extends AbstractRangeReaderIT {
+class FileRangeReaderIT extends AbstractRangeReaderIT {
 
     private static Path testFilePath;
 
@@ -83,7 +83,7 @@ public class FileRangeReaderIT extends AbstractRangeReaderIT {
             assertTrue(reader instanceof FileRangeReader, "Should be a FileRangeReader instance");
 
             // Verify size matches
-            assertEquals(1024, reader.size(), "File size should match");
+            assertEquals(1024, reader.size().getAsLong(), "File size should match");
 
             // Read some data to verify it works correctly
             ByteBuffer buffer = reader.readRange(0, 10).flip();
