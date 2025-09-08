@@ -15,13 +15,17 @@
  */
 package io.tileverse.rangereader.s3;
 
+import static java.util.Optional.*;
+
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
+import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -147,11 +151,15 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
         private S3Reference s3Location;
         private S3Client s3Client;
 
-        private AwsCredentialsProvider credentialsProvider;
-        private boolean forcePathStyle;
         private Region region;
+        private boolean forcePathStyle;
+
+        // authentication related parameters
+        private AwsCredentialsProvider credentialsProvider;
         private String awsAccessKeyId;
         private String awsSecretAccessKey;
+        private boolean useDefaultCredentialsProvider;
+        private String defaultCredentialsProfile;
 
         private Builder() {
             // Initialize with empty S3Location
@@ -177,6 +185,57 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          */
         public Builder awsSecretAccessKey(String awsSecretAccessKey) {
             this.awsSecretAccessKey = awsSecretAccessKey;
+            return this;
+        }
+
+        /**
+         * Controls whether to use the AWS default credentials provider chain for authentication.
+         *
+         * <p>When set to {@code false} (the default), no credentials provider is configured,
+         * allowing access to publicly accessible S3 resources without authentication.
+         * This is useful for accessing public datasets like Overture Maps without requiring
+         * AWS credentials to be configured.
+         *
+         * <p>When set to {@code true}, the AWS default credentials provider chain is used,
+         * which looks for credentials in the standard AWS locations.
+         *
+         * <p><strong>Note:</strong> If explicit {@link #awsAccessKeyId(String)} and
+         * {@link #awsSecretAccessKey(String)} are provided, they take precedence over this setting.
+         *
+         * @param useDefaultCredentialsProvider whether to use the default credentials provider chain
+         * @return this builder
+         */
+        public Builder useDefaultCredentialsProvider(boolean useDefaultCredentialsProvider) {
+            this.useDefaultCredentialsProvider = useDefaultCredentialsProvider;
+            return this;
+        }
+
+        /**
+         * Sets the AWS credentials profile name to use when the default credentials provider is enabled.
+         *
+         * <p>This parameter is only effective when {@link #useDefaultCredentialsProvider(boolean)}
+         * is set to {@code true}. If not specified, the 'default' profile is used.
+         *
+         * <p>The profile should exist in the AWS credentials file (typically {@code ~/.aws/credentials})
+         * or AWS config file (typically {@code ~/.aws/config}).
+         *
+         * <p>Example profiles:
+         * <pre>{@code
+         * // In ~/.aws/credentials
+         * [default]
+         * aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+         * aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+         *
+         * [production]
+         * aws_access_key_id = AKIAI44QH8DHBEXAMPLE
+         * aws_secret_access_key = je7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY
+         * }</pre>
+         *
+         * @param defaultCredentialsProfile the AWS credentials profile name
+         * @return this builder
+         */
+        public Builder defaultCredentialsProfile(String defaultCredentialsProfile) {
+            this.defaultCredentialsProfile = defaultCredentialsProfile;
             return this;
         }
 
@@ -332,10 +391,31 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
         }
 
         /**
-         * Builds the S3RangeReader.
+         * Builds the S3RangeReader with the configured parameters.
          *
-         * @return a new S3RangeReader instance
-         * @throws IOException if an error occurs during construction
+         * <p>This method creates a new {@link S3RangeReader} instance by:
+         * <ol>
+         * <li><strong>Validating required parameters:</strong> Ensures bucket and key are set</li>
+         * <li><strong>Creating S3 client:</strong> If no explicit client was provided via
+         * {@link #s3Client(S3Client)}, builds one using:
+         *   <ul>
+         *   <li>Credentials resolved via {@link #resolveCredentialsProvider()}</li>
+         *   <li>Region resolved via {@link #resolveRegion()}</li>
+         *   <li>Endpoint override if specified in the URI</li>
+         *   <li>Path-style access when required by the endpoint or explicitly enabled</li>
+         *   </ul>
+         * </li>
+         * <li><strong>Validating S3 object access:</strong> Performs a HEAD request to verify
+         * the object exists and retrieve its size</li>
+         * </ol>
+         *
+         * <p><strong>Thread Safety:</strong> The returned {@link S3RangeReader} is thread-safe
+         * and can be used concurrently from multiple threads.
+         *
+         * @return a new S3RangeReader instance configured with the specified parameters
+         * @throws IllegalStateException if bucket or key are not set
+         * @throws IOException if S3 client creation fails, the S3 object doesn't exist,
+         *         or other I/O errors occur during validation
          */
         public S3RangeReader build() throws IOException {
             if (s3Location.bucket() == null || s3Location.key() == null) {
@@ -347,30 +427,16 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
                 // Build S3 client
                 S3ClientBuilder clientBuilder = S3Client.builder();
 
-                if (credentialsProvider != null) {
-                    clientBuilder.credentialsProvider(credentialsProvider);
-                } else if (awsAccessKeyId != null && awsSecretAccessKey != null) {
-                    clientBuilder.credentialsProvider(StaticCredentialsProvider.create(
-                            AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey)));
-                } else {
-                    clientBuilder.credentialsProvider(
-                            DefaultCredentialsProvider.builder().build());
-                }
+                clientBuilder.credentialsProvider(resolveCredentialsProvider());
 
-                if (region != null) {
-                    clientBuilder.region(region);
-                } else if (s3Location.region() != null) {
-                    // Use region parsed from URL if no explicit region was set
-                    clientBuilder.region(Region.of(s3Location.region()));
-                }
+                resolveRegion().ifPresent(clientBuilder::region);
 
                 if (s3Location.endpoint() != null) {
                     clientBuilder.endpointOverride(s3Location.endpoint());
                 }
 
-                if (s3Location.requiresPathStyle() || forcePathStyle) {
-                    clientBuilder.forcePathStyle(true);
-                }
+                final boolean pathStyle = s3Location.requiresPathStyle() || forcePathStyle;
+                clientBuilder.forcePathStyle(pathStyle);
 
                 try {
                     client = clientBuilder.build();
@@ -380,6 +446,75 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
             }
 
             return new S3RangeReader(client, s3Location);
+        }
+
+        /**
+         * Resolves the AWS region to use for the S3 client based on the configured parameters.
+         *
+         * <p>This method determines which AWS region to use based on the following precedence:
+         * <ol>
+         * <li><strong>Explicit region:</strong> If {@link #region(Region)} was called,
+         * that region is returned directly.</li>
+         * <li><strong>URL-parsed region:</strong> If no explicit region was set but the S3 URL
+         * contains region information (e.g., from virtual hosted-style URLs like
+         * {@code https://bucket.s3.us-west-2.amazonaws.com/key}), that region is used.</li>
+         * <li><strong>No region (AWS SDK default):</strong> If neither explicit nor URL-parsed
+         * region is available, {@code empty()} is returned, allowing the AWS SDK to determine
+         * the region using its default chain (environment variables, config files, etc.).</li>
+         * </ol>
+         *
+         * @return the resolved AWS region, or {@code empty()} to use AWS SDK default region resolution
+         */
+        private Optional<Region> resolveRegion() {
+            Region region = this.region;
+            if (region == null && s3Location.region() != null) {
+                // Use region parsed from URL if no explicit region was set
+                region = Region.of(s3Location.region());
+            }
+            return ofNullable(region);
+        }
+
+        /**
+         * Resolves the AWS credentials provider based on the configured parameters.
+         *
+         * <p>This method determines which credentials provider to use based on the following precedence:
+         * <ol>
+         * <li><strong>Explicit credentials provider:</strong> If {@link #credentialsProvider(AwsCredentialsProvider)}
+         * was called, that provider is returned directly.</li>
+         * <li><strong>Static credentials:</strong> If both {@link #awsAccessKeyId(String)} and
+         * {@link #awsSecretAccessKey(String)} are provided, a {@link StaticCredentialsProvider}
+         * is created with those credentials.</li>
+         * <li><strong>Default credentials provider:</strong> If {@link #useDefaultCredentialsProvider(boolean)}
+         * is set to {@code true}, the AWS default credentials provider chain is used, optionally
+         * with a specific profile from {@link #defaultCredentialsProfile(String)}.</li>
+         * <li><strong>No credentials (public access):</strong> If none of the above are configured,
+         * {@link AnonymousCredentialsProvider} is returned to make unsigned requests to public S3 resources.</li>
+         * </ol>
+         *
+         * @return the resolved credentials provider, or {@code empty()} for anonymous (unsigned) requests
+         */
+        private AwsCredentialsProvider resolveCredentialsProvider() {
+            AwsCredentialsProvider provider = null;
+            if (this.credentialsProvider != null) {
+                provider = this.credentialsProvider;
+            } else if (awsAccessKeyId != null && awsSecretAccessKey != null) {
+                AwsBasicCredentials credentials = AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey);
+                provider = StaticCredentialsProvider.create(credentials);
+            } else if (this.useDefaultCredentialsProvider) {
+                DefaultCredentialsProvider.Builder builder = DefaultCredentialsProvider.builder()
+                        // Caches the last successful provider, avoiding repeated credential chain scanning
+                        .reuseLastProviderEnabled(true)
+                        // handle credential updates (like IAM role rotation) asynchronously without blocking requests
+                        .asyncCredentialUpdateEnabled(true);
+                if (defaultCredentialsProfile != null) {
+                    builder.profileName(defaultCredentialsProfile);
+                }
+                DefaultCredentialsProvider defaultCredentialsProvider = builder.build();
+                provider = defaultCredentialsProvider;
+            } else {
+                provider = AnonymousCredentialsProvider.create();
+            }
+            return provider;
         }
     }
 }

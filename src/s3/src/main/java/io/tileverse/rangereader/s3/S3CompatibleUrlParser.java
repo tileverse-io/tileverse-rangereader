@@ -280,7 +280,7 @@ class S3CompatibleUrlParser {
             return new S3Reference(null, pathStyleLocation.bucket(), pathStyleLocation.key(), region);
         }
 
-        // Non-AWS S3-compatible service
+        // Non-AWS S3-compatible service using path-style
         S3Reference pathStyleLocation = parsePathStyleComponents(uri);
         URI customEndpoint = buildCustomEndpoint(uri);
         return new S3Reference(customEndpoint, pathStyleLocation.bucket(), pathStyleLocation.key(), null);

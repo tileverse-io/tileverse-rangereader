@@ -20,9 +20,9 @@ import static io.tileverse.rangereader.it.RangeReaderFactoryIT.testCreate;
 import static io.tileverse.rangereader.it.RangeReaderFactoryIT.testFindBestProvider;
 import static io.tileverse.rangereader.it.RangeReaderFactoryIT.testS3;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assume.assumeNoException;
 
 import io.tileverse.rangereader.RangeReader;
+import io.tileverse.rangereader.RangeReaderFactory;
 import io.tileverse.rangereader.gcs.GoogleCloudStorageRangeReader;
 import io.tileverse.rangereader.gcs.GoogleCloudStorageRangeReaderProvider;
 import io.tileverse.rangereader.http.HttpRangeReader;
@@ -32,8 +32,6 @@ import java.io.IOException;
 import java.net.URI;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.core.exception.SdkClientException;
 
 @Testcontainers(disabledWithoutDocker = true)
 class RangeReaderFactoryOnlineIT {
@@ -79,16 +77,11 @@ class RangeReaderFactoryOnlineIT {
         testAzureBlob(onlineURI, null);
     }
 
+    /**
+     * Tests publicly accessible S3 resources
+     */
     @Test
-    void testS3Online() throws IOException {
-        DefaultCredentialsProvider defaultCredentialsProvider =
-                DefaultCredentialsProvider.builder().build();
-        try {
-            defaultCredentialsProvider.resolveCredentials();
-        } catch (SdkClientException noCredentials) {
-            assumeNoException("Test requires AWS credentials", noCredentials);
-        }
-
+    void testS3OnlineOvertureMaps() throws IOException {
         // virtual hosted-style (legacy format)
         testS3("https://overturemaps-tiles-us-west-2-beta.s3.amazonaws.com/2025-08-20/base.pmtiles");
 
@@ -112,6 +105,16 @@ class RangeReaderFactoryOnlineIT {
 
         // path-style with explicit region
         testForceHttp("https://s3.us-west-2.amazonaws.com/overturemaps-tiles-us-west-2-beta/2025-08-20/base.pmtiles");
+    }
+
+    /**
+     * This is an S3-hosted URL with a custom virtual hosted style, not a valid S3 URL, hence {@link RangeReaderFactory} should use {@link HttpRangeReaderProvider}
+     */
+    @Test
+    void testS3OnlineCustomVirtualHostedStyleFallsBackToHttp() throws IOException {
+        URI uri = URI.create("https://demo-bucket.protomaps.com/v4.pmtiles");
+        testFindBestProvider(uri, HttpRangeReaderProvider.class);
+        testCreate(new RangeReaderConfig().uri(uri), HttpRangeReader.class);
     }
 
     private void testForceHttp(String url) throws IOException {
