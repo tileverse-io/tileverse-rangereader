@@ -196,6 +196,12 @@
       </dependency>
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
+        <artifactId>apache-client</artifactId>
+        <version>${aws-s3.version}</version>
+        <optional>true</optional>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
         <artifactId>auth</artifactId>
         <version>${aws-s3.version}</version>
         <optional>true</optional>
