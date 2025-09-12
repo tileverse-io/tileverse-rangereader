@@ -280,7 +280,8 @@ public class RangeReaderConfig {
         RangeReaderConfig config = new RangeReaderConfig().uri(uri);
         config.providerId(providerId);
 
-        Properties copy = new Properties(properties);
+        Properties copy = new Properties();
+        copy.putAll(properties);
         copy.remove(URI_KEY);
         copy.remove(PROVIDER_ID_KEY);
         copy.forEach((k, v) -> config.setParameter(String.valueOf(k), v));

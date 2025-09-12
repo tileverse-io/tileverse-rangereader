@@ -38,9 +38,9 @@ class RangeReaderFactoryOnlineIT {
 
     @Test
     void testHTTPOnline() throws IOException {
-        // httpbin.org provides a /range/1024 endpoint that streams n bytes and allows specifying a Range header to
+        // httpbin.io provides a /range/1024 endpoint that streams n bytes and allows specifying a Range header to
         // select a subset of the data.
-        String url = "https://httpbin.org/range/1024";
+        String url = "https://httpbin.io/range/1024";
         testFindBestProvider(URI.create(url), HttpRangeReaderProvider.class);
 
         RangeReaderConfig config = new RangeReaderConfig().uri(URI.create(url));
