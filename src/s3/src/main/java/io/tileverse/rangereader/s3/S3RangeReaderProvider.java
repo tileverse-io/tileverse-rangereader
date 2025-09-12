@@ -273,7 +273,7 @@ public class S3RangeReaderProvider extends AbstractRangeReaderProvider {
         URI uri = opts.uri();
         Builder builder = S3RangeReader.builder().uri(uri);
         opts.getParameter(FORCE_PATH_STYLE).ifPresent(builder::forcePathStyle);
-        opts.getParameter(REGION).map(Region::of).ifPresent(builder::region);
+        opts.getParameter(REGION).filter(r -> !r.isBlank()).map(Region::of).ifPresent(builder::region);
         opts.getParameter(AWS_ACCESS_KEY_ID).ifPresent(builder::awsAccessKeyId);
         opts.getParameter(AWS_SECRET_ACCESS_KEY).ifPresent(builder::awsSecretAccessKey);
         opts.getParameter(USE_DEFAULT_CREDENTIALS_PROVIDER).ifPresent(builder::useDefaultCredentialsProvider);

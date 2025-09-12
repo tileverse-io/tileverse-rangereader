@@ -16,6 +16,7 @@
 package io.tileverse.rangereader.s3;
 
 import java.net.URI;
+import java.util.Optional;
 
 /**
  * Represents the components of an S3-compatible URL.
@@ -44,6 +45,10 @@ record S3Reference(URI endpoint, String bucket, String key, String region) {
     public boolean requiresPathStyle() {
         // If we have an endpoint, it came from an HTTP/HTTPS URI, so use path-style
         return endpoint != null;
+    }
+
+    public Optional<URI> endpointOverride() {
+        return Optional.ofNullable(endpoint);
     }
 
     @Override

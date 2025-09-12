@@ -15,7 +15,7 @@
  */
 package io.tileverse.rangereader.s3;
 
-import static java.util.Optional.*;
+import static java.util.Optional.ofNullable;
 
 import io.tileverse.rangereader.AbstractRangeReader;
 import io.tileverse.rangereader.RangeReader;
@@ -29,10 +29,12 @@ import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -42,10 +44,48 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 /**
- * A RangeReader implementation that reads from AWS S3.
+ * A {@link RangeReader} implementation that reads data from an AWS S3-compatible
+ * object storage service.
  * <p>
- * This class enables reading data stored in S3 buckets using the
- * AWS SDK for Java v2.
+ * This class enables efficient reading of data from S3 objects by leveraging
+ * the {@link software.amazon.awssdk.services.s3.S3Client} from the AWS SDK for Java v2.
+ * It is designed to handle both standard AWS S3 and self-hosted S3-compatible
+ * services like MinIO.
+ * <h2>Authentication and Configuration</h2>
+ * The {@link Builder} for this class provides a flexible and robust mechanism for
+ * resolving credentials and other client settings. The builder determines which
+ * credentials provider to use based on a defined precedence:
+ * <ol>
+ * <li><b>Explicit Credentials:</b> If an explicit {@link AwsCredentialsProvider}
+ * is provided, or if an access key and secret key are set directly, these are used.</li>
+ *
+ * <li><b>Default Credential Chain:</b> If {@code useDefaultCredentialsProvider} is enabled,
+ * the client first attempts to resolve credentials from the AWS default credential chain,
+ * which checks environment variables, system properties, and shared credentials files.
+ * If a {@code defaultCredentialsProfile} is also specified, the chain is configured
+ * to prioritize that profile.</li>
+ *
+ * <li><b>Forced Profile:</b> If a {@code defaultCredentialsProfile} is set but
+ * {@code useDefaultCredentialsProvider} is disabled, the client bypasses the
+ * full default chain and uses only the {@link ProfileCredentialsProvider} for
+ * the specified profile.</li>
+ *
+ * <li><b>Anonymous Access:</b> If no credentials are explicitly configured, the
+ * client uses {@link AnonymousCredentialsProvider} to make unsigned requests.</li>
+ * </ol>
+ *
+ * <h2>Profile-Based Configuration</h2>
+ * When a named profile (e.g., 'minio') is used, the builder also attempts to resolve the
+ * AWS region from the corresponding section in the {@code ~/.aws/config} file. This
+ * allows for a cleaner separation of credentials and configuration. For S3-compatible
+ * services like MinIO, the region is a required parameter for the SDK's signing process,
+ * even though the service itself may not use it.
+ *
+ * <h2>S3-Compatible Endpoints</h2>
+ * This builder supports custom S3-compatible endpoints via the {@code endpointOverride}
+ * method. For most self-hosted services (e.g., MinIO), it is critical to enable
+ * <b>path-style access</b> by setting {@code forcePathStyle(true)} to ensure the
+ * request is correctly addressed to the bucket.
  */
 public class S3RangeReader extends AbstractRangeReader implements RangeReader {
 
@@ -431,9 +471,7 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
 
                 resolveRegion().ifPresent(clientBuilder::region);
 
-                if (s3Location.endpoint() != null) {
-                    clientBuilder.endpointOverride(s3Location.endpoint());
-                }
+                s3Location.endpointOverride().ifPresent(clientBuilder::endpointOverride);
 
                 final boolean pathStyle = s3Location.requiresPathStyle() || forcePathStyle;
                 clientBuilder.forcePathStyle(pathStyle);
@@ -467,9 +505,17 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          */
         private Optional<Region> resolveRegion() {
             Region region = this.region;
-            if (region == null && s3Location.region() != null) {
-                // Use region parsed from URL if no explicit region was set
-                region = Region.of(s3Location.region());
+            if (region == null) {
+                if (s3Location.region() != null) {
+                    // Use region parsed from URL if no explicit region was set
+                    region = Region.of(s3Location.region());
+                } else if (defaultCredentialsProfile != null) {
+                    // if a profile was specified, we need to...
+                    DefaultAwsRegionProviderChain profileProvider = DefaultAwsRegionProviderChain.builder()
+                            .profileName(defaultCredentialsProfile)
+                            .build();
+                    region = profileProvider.getRegion();
+                }
             }
             return ofNullable(region);
         }
@@ -484,37 +530,48 @@ public class S3RangeReader extends AbstractRangeReader implements RangeReader {
          * <li><strong>Static credentials:</strong> If both {@link #awsAccessKeyId(String)} and
          * {@link #awsSecretAccessKey(String)} are provided, a {@link StaticCredentialsProvider}
          * is created with those credentials.</li>
-         * <li><strong>Default credentials provider:</strong> If {@link #useDefaultCredentialsProvider(boolean)}
-         * is set to {@code true}, the AWS default credentials provider chain is used, optionally
-         * with a specific profile from {@link #defaultCredentialsProfile(String)}.</li>
+         * <li><strong>Default chain with optional profile:</strong> If {@link #useDefaultCredentialsProvider(boolean)}
+         * is set to {@code true}, the AWS default credentials provider chain is used. If a profile name
+         * is also provided via {@link #defaultCredentialsProfile(String)}, the chain is built to
+         * prioritize that specific profile.</li>
+         * <li><strong>Forced profile provider:</strong> If {@link #useDefaultCredentialsProvider(boolean)} is
+         * {@code false} but a {@link #defaultCredentialsProfile(String)} is specified, the
+         * {@link ProfileCredentialsProvider} for that profile is used, bypassing the default chain.</li>
          * <li><strong>No credentials (public access):</strong> If none of the above are configured,
-         * {@link AnonymousCredentialsProvider} is returned to make unsigned requests to public S3 resources.</li>
+         * {@link AnonymousCredentialsProvider} is returned for unsigned requests to public S3 resources.</li>
          * </ol>
          *
-         * @return the resolved credentials provider, or {@code empty()} for anonymous (unsigned) requests
+         * @return The resolved {@link AwsCredentialsProvider} instance.
          */
         private AwsCredentialsProvider resolveCredentialsProvider() {
-            AwsCredentialsProvider provider = null;
+
             if (this.credentialsProvider != null) {
-                provider = this.credentialsProvider;
-            } else if (awsAccessKeyId != null && awsSecretAccessKey != null) {
+                return this.credentialsProvider;
+            }
+
+            if (awsAccessKeyId != null && awsSecretAccessKey != null) {
                 AwsBasicCredentials credentials = AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey);
-                provider = StaticCredentialsProvider.create(credentials);
-            } else if (this.useDefaultCredentialsProvider) {
-                DefaultCredentialsProvider.Builder builder = DefaultCredentialsProvider.builder()
+                return StaticCredentialsProvider.create(credentials);
+            }
+            if (this.useDefaultCredentialsProvider) {
+                DefaultCredentialsProvider.Builder defaultChainBuilder = DefaultCredentialsProvider.builder()
                         // Caches the last successful provider, avoiding repeated credential chain scanning
                         .reuseLastProviderEnabled(true)
                         // handle credential updates (like IAM role rotation) asynchronously without blocking requests
                         .asyncCredentialUpdateEnabled(true);
+
                 if (defaultCredentialsProfile != null) {
-                    builder.profileName(defaultCredentialsProfile);
+                    defaultChainBuilder.profileName(defaultCredentialsProfile);
                 }
-                DefaultCredentialsProvider defaultCredentialsProvider = builder.build();
-                provider = defaultCredentialsProvider;
-            } else {
-                provider = AnonymousCredentialsProvider.create();
+                return defaultChainBuilder.build();
             }
-            return provider;
+
+            if (defaultCredentialsProfile != null) {
+                // don't use the full default credentials chain, just the profile
+                return ProfileCredentialsProvider.create(defaultCredentialsProfile);
+            }
+
+            return AnonymousCredentialsProvider.create();
         }
     }
 }
