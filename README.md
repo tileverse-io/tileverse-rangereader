@@ -1,8 +1,8 @@
 # Tileverse Range Reader
 
-A modern Java library (Java 17+) for efficient random access to byte ranges from local files, HTTP servers, and cloud storage services (S3, Azure Blob, Google Cloud Storage).
+> **⚠️ ARCHIVED**: This repository has been archived and is no longer maintained. The Range Reader library has been merged into the main Tileverse monorepo at [tileverse-io/tileverse](https://github.com/tileverse-io/tileverse). Please use the consolidated repository for the latest version. Documentation is now available at [tileverse.io](https://tileverse.io).
 
-**📖 [Documentation](https://tileverse-io.github.io/tileverse-rangereader/)** | **🚀 [Quick Start](https://tileverse-io.github.io/tileverse-rangereader/user-guide/quick-start/)** | **🏗️ [Architecture](https://tileverse-io.github.io/tileverse-rangereader/arc42/)**
+A modern Java library (Java 17+) for efficient random access to byte ranges from local files, HTTP servers, and cloud storage services (S3, Azure Blob, Google Cloud Storage).
 
 ## Why Tileverse Range Reader?
 
